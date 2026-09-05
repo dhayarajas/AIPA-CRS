@@ -1,0 +1,20 @@
+\begin{tabular}{l ccc ccc ccc}
+\toprule
+& \multicolumn{3}{c}{Natural (all, $n$=1077)} & \multicolumn{3}{c}{Natural conflict ($n$=62)} & \multicolumn{3}{c}{Synthetic conflict ($n$=78)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+Control & $\Delta$ & $p_{\text{Holm}}$ & $d$ & $\Delta$ & $p_{\text{Holm}}$ & $d$ & $\Delta$ & $p_{\text{Holm}}$ & $d$ \\
+\midrule
+LTP-only & +0.037 & $<$0.001$^{*}$ & +0.18 & +0.040 & 0.457 & +0.25 & +0.186 & $<$0.001$^{*}$ & +0.57 \\
+STI-only & -0.012 & 0.251 & -0.07 & -0.056 & 0.202 & -0.31 & +0.000 & 1.000 & +0.00 \\
+Naive fusion & +0.002 & 1.000 & +0.01 & -0.008 & 1.000 & -0.07 & +0.038 & 1.000 & +0.15 \\
+Adaptive fusion & -0.003 & 1.000 & -0.02 & +0.008 & 1.000 & +0.07 & +0.019 & 1.000 & +0.08 \\
+Sequential (GRU) & +0.025 & 0.001$^{*}$ & +0.12 & +0.024 & 1.000 & +0.11 & +0.192 & $<$0.001$^{*}$ & +0.59 \\
+Conversation-aware & +0.013 & 0.303 & +0.06 & -0.016 & 1.000 & -0.10 & +0.186 & $<$0.001$^{*}$ & +0.56 \\
+\midrule
+AIPA w/o relationship & -0.012 & 0.303 & -0.06 & -0.056 & 0.327 & -0.28 & +0.026 & 1.000 & +0.11 \\
+AIPA w/o counterfactual & -0.005 & 1.000 & -0.03 & -0.048 & 0.327 & -0.28 & -0.006 & 1.000 & -0.02 \\
+AIPA w/o clarification & +0.000 & 1.000 & +0.00 & -0.048 & 0.457 & -0.25 & +0.006 & 1.000 & +0.02 \\
+AIPA w/o persistence & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+AIPA (rule policy) & +0.004 & 1.000 & +0.02 & -0.016 & 1.000 & -0.10 & +0.038 & 1.000 & +0.15 \\
+\bottomrule
+\end{tabular}
