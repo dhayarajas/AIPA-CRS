@@ -14,6 +14,7 @@ import pandas as pd
 from . import RELATIONSHIPS
 from .config import environment_report
 from .experiments import PRIMARY, Results
+from .models import BASELINE_NAMES
 
 ALPHA = 0.05
 
@@ -92,11 +93,13 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
       "synthetic relationship labels. ReDial carries no native intent/preference relationship annotation; no human-verified "
       "labels were available for this run unless stated in Section 2. Counterfactual analyses are model-based "
       "interventions and must not be read as causal effects in the population. Approximate baselines are re-implementations, "
-      "not reproductions of MRGE, DiffLSRec or any other published system.\n")
+      "not reproductions of MRGE, DiffLSRec or any other published system; SASRec and KBRD-style are re-implementations on "
+      "ReDial inputs (KBRD-style without the external knowledge graph), not the original code.\n")
     A("## 1. Research question and hypotheses\n")
     A("**RQ.** Does explicit intent-preference arbitration help specifically when current short-term intent (STI) conflicts with "
       "historical long-term preference (LTP)?\n")
-    A("* **H1** - AIPA (full) improves ranking quality over LTP-only, STI-only and naive fusion on the overall natural test set.\n"
+    A("* **H1** - AIPA (full) improves ranking quality over the baselines (LTP-only, STI-only, fusion, GRU, conversation-aware, "
+      "SASRec, KBRD-style) on the overall natural test set.\n"
       "* **H2** - The gain is concentrated on Conflict/Override instances (natural weak-labelled subset and controlled synthetic subset).\n"
       "* **H3** - Removing the relationship classifier, the counterfactual diagnostic, clarification or temporal persistence degrades performance.\n"
       "* **H4** - The relationship classifier recovers reference labels above chance and is reasonably calibrated.\n")
@@ -266,11 +269,11 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
         A("_NOT RUN._\n")
     A("## 13. Hypothesis verdicts\n")
     rows = []
-    for c in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware"]:
+    for c in BASELINE_NAMES:
         v, r = _verdict(sig, "natural", "Hit@10", c)
         rows.append({"hypothesis": "H1 (overall)", "comparison": f"{PRIMARY} vs {c}", "verdict": v, "mean_diff": r["mean_diff"] if r else np.nan, "p_holm": r["wilcoxon_p_holm"] if r else np.nan})
     for sub in CONFLICT_SUBSETS:
-        for c in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion"]:
+        for c in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "SASRec", "KBRD-style"]:
             v, r = _verdict(sig, sub, "Hit@10", c)
             rows.append({"hypothesis": f"H2 ({sub})", "comparison": f"{PRIMARY} vs {c}", "verdict": v, "mean_diff": r["mean_diff"] if r else np.nan, "p_holm": r["wilcoxon_p_holm"] if r else np.nan})
     if len(rel):
@@ -294,7 +297,8 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
       "* ReDial seekers are crowd workers; cross-session history reflects worker behaviour across HITs, an implementation assumption "
       "standing in for real long-term preference. Ordering by `conversationId` is assumed chronological.\n"
       "* MovieLens genre joins by normalised title/year can mismatch remakes or same-titled films.\n"
-      "* Baselines are approximate re-implementations; no claim of reproducing MRGE, DiffLSRec or other published systems is made.\n"
+      "* Baselines are approximate re-implementations; no claim of reproducing MRGE, DiffLSRec, SASRec, KBRD or other published "
+      "systems is made (KBRD-style omits the external knowledge graph and response generator).\n"
       "* Counterfactual diagnostics are interventions on a trained model, not causal effects on users.\n"
       "* The novelty assessment in the accompanying design document is scoped; a broader literature search is needed before claiming "
       "AIPA-CRS is globally unprecedented.\n"
