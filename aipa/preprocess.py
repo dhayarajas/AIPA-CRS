@@ -312,7 +312,7 @@ def _sha1(text: str) -> str:
 
 class EmbeddingCache:
     """On-disk store of sentence embeddings keyed by the SHA-1 of the text
-    (``<interim>/text_cache_<model>.npz``) so repeated runs and seeds never
+    (``<interim>/text_cache_<model>_<id-hash>.npz``) so repeated runs and seeds never
     re-encode the same string."""
 
     def __init__(self, path: Path | None, dim: int):
@@ -392,7 +392,7 @@ class TextEncoder:
             cache_path = None
             if cfg.values.get("text_cache", True):
                 slug = re.sub(r"[^A-Za-z0-9._-]+", "_", self.name)
-                cache_path = cfg.path("interim_path") / f"text_cache_{slug}.npz"
+                cache_path = cfg.path("interim_path") / f"text_cache_{slug}_{_sha1(self.name)[:8]}.npz"
             self._cache = EmbeddingCache(cache_path, self.dim)
         else:
             self.vec = TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True, max_features=50000)

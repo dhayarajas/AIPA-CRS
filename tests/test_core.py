@@ -1,6 +1,8 @@
 """Fast unit tests (synthetic mini-corpus; no download required)."""
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 import torch
@@ -222,7 +224,7 @@ def test_minilm_encoder_dim_cache_and_model_shapes(mini, minilm_cfg):
     enc2 = TextEncoder(c)
     Z2 = enc2.encode(["a funny comedy", "a scary horror film"])
     assert enc2.n_encoded == 0 and enc2.n_cache_hits == 2 and np.array_equal(Z2[0], Z[0])
-    assert enc2.summary()["cache_path"].endswith("text_cache_sentence-transformers_all-MiniLM-L6-v2.npz")
+    assert enc2.summary()["cache_path"].endswith("text_cache_sentence-transformers_all-MiniLM-L6-v2_" + hashlib.sha1(c.embedding_model.encode()).hexdigest()[:8] + ".npz")
     inst = build_instances(mini, c)
     index = build_item_index(mini, enc, c)
     assert index.content.shape[1] == 384 + len(ALL_GENRES)

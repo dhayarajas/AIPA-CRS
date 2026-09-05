@@ -62,7 +62,7 @@ to vectors by `aipa/preprocess.py::TextEncoder`; two backends are available in
 LTP/STI encoders and the item tower project it to `hidden_dim` with a learned linear layer.
 Item titles are enriched with MovieLens genres before encoding (`"Title (year). Genres: Comedy, Romance"`,
 `item_text_genres: true`). Pretrained embeddings are computed on CPU in batches of
-`encoder_batch_size` (128) and cached in `data/interim/text_cache_<model>.npz` keyed by the SHA-1 of
+`encoder_batch_size` (128) and cached in `data/interim/text_cache_<model>_<id-hash>.npz` keyed by the SHA-1 of
 the text, so repeated runs and seeds re-encode nothing (`text_cache: false` disables the cache).
 In quick mode the first MiniLM encode (~25k unique strings) takes about 30 s on 8 CPU cores and
 full mode roughly four times that; timing and cache statistics are printed and stored in

@@ -21,7 +21,7 @@ common:
   embedding_model: tfidf-svd
   text_dim: 128
   encoder_batch_size: 128       # sentence-transformers batch size (CPU)
-  text_cache: true              # cache embeddings in data/interim/text_cache_<model>.npz (keyed by sha1 of the text)
+  text_cache: true              # cache embeddings in data/interim/text_cache_<model>_<id-hash>.npz (keyed by sha1 of the text)
   embedding_fallback: true      # fall back to tfidf-svd (and record why) if the pretrained model cannot be loaded
   item_text_genres: true        # item text = "Title (year). Genres: Comedy, Romance" (false: bare ReDial title)
   hidden_dim: 64
