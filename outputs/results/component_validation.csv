@@ -1,5 +1,5 @@
 component,status,note
-dataset acquisition & validation,PASS,3 files hashed
+dataset acquisition & validation,PASS,4 files hashed
 instance construction (leak-free),PASS,"train=9281, test=1202"
 weak-rule relationship labels,PASS,
 controlled synthetic injection,PASS,125 synthetic test instances
@@ -10,6 +10,8 @@ baseline: Naive fusion,PASS,
 baseline: Adaptive fusion,PASS,
 baseline: Sequential (GRU),PASS,
 baseline: Conversation-aware,PASS,
+baseline: SASRec,PASS,
+baseline: KBRD-style,PASS,
 model: AIPA w/o relationship,PASS,
 model: AIPA w/o counterfactual,PASS,
 model: AIPA w/o clarification,PASS,
@@ -19,18 +21,22 @@ model: AIPA (full),PASS,
 relationship classifier metrics,PASS,
 arbitration & clarification metrics,PASS,
 counterfactual driver diagnostic,PASS,
-temporal persistence tracker,PASS,33 shifts detected
+temporal persistence tracker,PASS,52 shifts detected
 ranking metrics + bootstrap CI,PASS,
 paired significance tests,PASS,
 multi-seed evaluation,PASS,2 seed(s)
 conflict-sensitive evaluation,PASS,
 sensitivity analyses,PASS,
+strict + broad natural conflict subsets,PASS,"strict: n=62, broad: n=256, broad_only: n=194, synthetic_conflict: n=78, natural: n=1077"
+history-bucket / genre breakdown,PASS,
+persistence effect on affected subset,PASS,n_affected=87
+success criteria table,PASS,
 alpha sweep,PASS,
 calibration analysis,PASS,
 efficiency accounting,PASS,
 error analysis,PASS,
 case studies (>=10),PASS,12 cases
-figures,PASS,17 figures in /home/ubuntu/AIPA-CRS/outputs/figures
+figures,PASS,21 figures in /home/ubuntu/AIPA-CRS/outputs/figures
 tables,PASS,
 results serialised,PASS,
 report (Markdown + HTML),PASS,
