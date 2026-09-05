@@ -1,0 +1,18 @@
+\begin{tabular}{lrrrr}
+\toprule
+Model & Parameters & Size (MB) & Train (s) & CPU inf.\ (ms/sample) \\
+\midrule
+LTP-only & 515,597 & 2.06 & 2.5 & 0.015 \\
+STI-only & 515,597 & 2.06 & 3.1 & 0.026 \\
+Naive fusion & 515,597 & 2.06 & 2.5 & 0.016 \\
+Adaptive fusion & 526,862 & 2.11 & 2.8 & 0.022 \\
+Sequential (GRU) & 492,877 & 1.97 & 8.0 & 0.034 \\
+Conversation-aware & 476,173 & 1.91 & 1.6 & 0.016 \\
+AIPA w/o relationship & 547,222 & 2.19 & 5.1 & 0.038 \\
+AIPA w/o counterfactual & 547,222 & 2.19 & 5.3 & 0.035 \\
+AIPA w/o clarification & 547,542 & 2.19 & 5.7 & 0.041 \\
+AIPA w/o persistence & 547,542 & 2.19 & 4.0 & 0.039 \\
+AIPA (rule policy) & 535,378 & 2.14 & 5.5 & 0.046 \\
+AIPA (full) & 547,542 & 2.19 & 4.0 & 0.044 \\
+\bottomrule
+\end{tabular}

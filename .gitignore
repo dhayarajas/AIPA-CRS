@@ -15,3 +15,11 @@ data/processed/
 # quick-run artefacts are committed (regenerate with `python -m aipa.pipeline`);
 # only the large raw per-instance dump is excluded
 outputs/results/per_sample_metrics.csv.gz
+
+# LaTeX build artefacts (paper/main.pdf is committed)
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
