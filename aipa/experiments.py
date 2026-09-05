@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from . import ACTIONS, RELATIONSHIPS
+from . import ACTIONS, REL2ID, RELATIONSHIPS
 from .config import Config, environment_report
 from .data import ReDial, load_dataset
 from .evaluate import (
@@ -212,6 +212,46 @@ def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None 
     build_tables(res)
     save_results(res)
     return res
+
+
+# --------------------------------------------------------------------------
+# validation-split hyper-parameter sweep (never touches the test split)
+# --------------------------------------------------------------------------
+
+def validation_sweep(cfg: Config, grid: list[dict], prepared: tuple | None = None, model_name: str = PRIMARY,
+                     seeds: list[int] | None = None, verbose: bool = True) -> pd.DataFrame:
+    """Train ``model_name`` once per config override in ``grid`` and score it on
+    the VALIDATION split: Hit@10 / NDCG@10 on natural instances and relationship
+    macro-F1 / Conflict-F1 against the weak-rule validation labels (noisy; not
+    human labels).  Returns one row per (override, seed) plus the mean over seeds."""
+    ds, enc, index, inst, labels, X, human = prepared or prepare(cfg, verbose)
+    Y = {k: label_tensors(v) for k, v in labels.items()}
+    rel_true = Y["valid"]["rel"].numpy()
+    conflict = np.isin(rel_true, [REL2ID["Conflict"], REL2ID["Override"]])
+    rows = []
+    for over in grid:
+        c = Config(values={**cfg.values, **over}, run_mode=cfg.run_mode)
+        for seed in seeds or cfg.seeds[:1]:
+            model, info = train_model(model_name, index.content, X["train"], Y["train"], X["valid"], c, seed,
+                                      lambda_rel=c.lambda_rel, lambda_act=c.lambda_act, verbose=False)
+            pred = predict(model, X["valid"], c)
+            r = per_sample_ranking(pred["rank"], ks=(10,))
+            row = {**over, "seed": seed, "valid_Hit@10": float(r["Hit@10"].mean()), "valid_NDCG@10": float(r["NDCG@10"].mean()),
+                   "valid_conflict_Hit@10": float(r["Hit@10"].values[conflict].mean()) if conflict.any() else np.nan,
+                   "epochs_run": info["efficiency"]["epochs_run"], "train_time_s": info["efficiency"]["train_time_s"]}
+            if "rel_logits" in pred:
+                rm = relationship_metrics(rel_true, pred["rel_logits"].argmax(1))
+                row.update(valid_macro_f1=rm["macro_f1"], valid_F1_Conflict=rm["F1_Conflict"], valid_F1_Override=rm["F1_Override"])
+            rows.append(row)
+            if verbose:
+                print("[sweep] " + ", ".join(f"{k}={v}" for k, v in row.items()))
+    df = pd.DataFrame(rows)
+    keys = [k for k in df.columns if any(k in o for o in grid)]
+    if not keys:
+        return df
+    mean = df.groupby(keys, dropna=False, sort=False).mean(numeric_only=True).drop(columns=["seed"]).reset_index()
+    mean["seed"] = "mean"
+    return pd.concat([df, mean], ignore_index=True)
 
 
 # --------------------------------------------------------------------------
