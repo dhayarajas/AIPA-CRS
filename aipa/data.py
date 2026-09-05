@@ -18,6 +18,8 @@ import json
 import pickle
 import re
 import ssl
+import sys
+import time
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -132,11 +134,25 @@ def dataset_status(cfg: Config) -> pd.DataFrame:
 
 def _stream(url: str, dest: Path, context: ssl.SSLContext | None = None) -> None:
     with urlopen(url, timeout=120, context=context) as r, dest.open("wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done, t0, last = 0, time.perf_counter(), 0.0
         while True:
             chunk = r.read(1 << 20)
             if not chunk:
                 break
             f.write(chunk)
+            done += len(chunk)
+            now = time.perf_counter()
+            if now - last >= 2 or done == total:
+                last = now
+                rate = done / max(now - t0, 1e-6) / 1e6
+                pct = f" ({100 * done / total:.0f}%)" if total else ""
+                eta = f", ~{(total - done) / max(rate * 1e6, 1):.0f}s left" if total else ""
+                print(f"\r  {dest.name}: {done / 1e6:.0f}/{total / 1e6:.0f} MB{pct} at {rate:.1f} MB/s{eta}",
+                      end="", flush=True)
+        print(file=sys.stdout)
+    if total and done != total:
+        raise OSError(f"incomplete download: {done} of {total} bytes")
 
 
 def _download(url: str, dest: Path) -> bool:
@@ -149,7 +165,8 @@ def _download(url: str, dest: Path) -> bool:
             print(f"Download of {url} failed: {exc!r}")
             return False
         print(f"TLS verification failed for {url} ({exc.reason}); retrying without certificate "
-              "verification. Check the system clock if this persists.")
+              "verification (the archive is ~350 MB, progress is printed below). Check the system "
+              "clock if this persists.")
         try:
             _stream(url, dest, ssl._create_unverified_context())
             return True
