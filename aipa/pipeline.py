@@ -11,6 +11,7 @@ import pandas as pd
 
 from .config import load_config
 from .data import (
+    DatasetUnavailable,
     dataset_statistics,
     dataset_status,
     download_dataset,
@@ -99,8 +100,12 @@ def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bo
     if clean_outputs:
         shutil.rmtree(cfg.path("output_path"), ignore_errors=True)
     print(dataset_status(cfg).to_string())
-    if needs_download(cfg):
-        download_dataset(cfg)
+    if needs_download(cfg) and not download_dataset(cfg):
+        raise DatasetUnavailable(
+            "A dataset file could not be downloaded; see the messages above. Place "
+            "redial_dataset.zip under data/raw/redial/ and/or movies.csv under "
+            "data/external/ml-latest/, then re-run."
+        )
     validate_dataset(cfg)
     ds = load_dataset(cfg)
     stats = dataset_statistics(ds)
