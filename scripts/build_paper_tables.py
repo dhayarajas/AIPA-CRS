@@ -24,8 +24,14 @@ MODEL_ORDER = [
 BASELINES = MODEL_ORDER[:6]
 
 
+_ESC = {
+    "\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "$": "\\$", "&": "\\&", "%": "\\%",
+    "#": "\\#", "_": "\\_", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}",
+}
+
+
 def tex(s: str) -> str:
-    return str(s).replace("&", "\\&").replace("%", "\\%").replace("_", "\\_").replace("#", "\\#")
+    return "".join(_ESC.get(c, c) for c in str(s))
 
 
 def f3(x) -> str:
@@ -61,10 +67,12 @@ ranking_table("table_overall_synthetic.csv", "overall_synthetic", ci=False)
 
 # significance: AIPA (full) vs every other model, Hit@10, three subsets
 sig = pd.read_csv(RES / "table_significance.csv").query("treatment == 'AIPA (full)' and metric == 'Hit@10'")
+SIG_SUBSETS = ["natural", "conflict_natural", "conflict_synthetic"]
+sig_n = {s: int(sig.loc[sig.subset == s, "n"].iloc[0]) for s in SIG_SUBSETS}
 rows = []
 for m in MODEL_ORDER[:-1]:
     cells = [tex(m)]
-    for sub in ["natural", "conflict_natural", "conflict_synthetic"]:
+    for sub in SIG_SUBSETS:
         r = sig[(sig.control == m) & (sig.subset == sub)]
         if r.empty or pd.isna(r.iloc[0]["t_p_holm"]):
             cells += ["--", "--", "--"]
@@ -75,7 +83,7 @@ for m in MODEL_ORDER[:-1]:
     rows.append(" & ".join(cells) + " \\\\")
     if m == BASELINES[-1]:
         rows.append("\\midrule")
-write("significance", "\\begin{tabular}{l ccc ccc ccc}\n\\toprule\n& \\multicolumn{3}{c}{Natural (all, $n$=1077)} & \\multicolumn{3}{c}{Natural conflict ($n$=62)} & \\multicolumn{3}{c}{Synthetic conflict ($n$=78)} \\\\\n\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}\nControl & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
+write("significance", "\\begin{tabular}{l ccc ccc ccc}\n\\toprule\n& \\multicolumn{3}{c}{Natural (all, $n$=" + str(sig_n["natural"]) + ")} & \\multicolumn{3}{c}{Natural conflict ($n$=" + str(sig_n["conflict_natural"]) + ")} & \\multicolumn{3}{c}{Synthetic conflict ($n$=" + str(sig_n["conflict_synthetic"]) + ")} \\\\\n\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}\nControl & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
 # relationship classification (mean over seeds)
 rel = pd.read_csv(RES / "table_relationship.csv")
