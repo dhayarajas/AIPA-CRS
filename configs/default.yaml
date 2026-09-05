@@ -1,0 +1,67 @@
+# AIPA-CRS configuration
+# RUN_MODE is selected in the notebook (or via AIPA_RUN_MODE env var); the
+# matching block below is merged over `common`.
+
+common:
+  dataset_name: ReDial
+  dataset_source: "https://github.com/ReDialData/website/raw/data/redial_dataset.zip"
+  dataset_path: data/raw/redial
+  processed_path: data/processed
+  interim_path: data/interim
+  external_path: data/external
+  output_path: outputs
+  # "tfidf-svd" is a lightweight word n-gram TF-IDF + SVD encoder that runs on CPU
+  # in seconds.  Any sentence-transformers model id (e.g. all-MiniLM-L6-v2) can be
+  # used instead when the weights are available offline.
+  embedding_model: tfidf-svd
+  text_dim: 128
+  hidden_dim: 64
+  learning_rate: 0.003
+  weight_decay: 0.00001
+  batch_size: 256
+  epochs: 5
+  seed: 42
+  seeds: [42]
+  top_k: [10, 20]
+  alpha: 0.5
+  alpha_grid: [0.0, 0.25, 0.5, 0.75, 1.0]
+  relationship_threshold: 0.5
+  clarification_threshold: 0.6
+  device: auto
+  max_history: 50
+  max_context_turns: 6
+  history_temporal_decay: 0.9
+  # synthetic controlled conflict injection
+  injection_rate: 0.15
+  injection_intensities: [1, 2, 3]
+  bootstrap_samples: 500
+  min_history_for_ltp: 3
+  # counterfactual driver diagnostic: top-K disagreement threshold for a driver
+  cf_tau: 0.1
+  cf_dominance: 1.5   # a signal is the sole driver when its top-K disruption is >= dominance x the other signal's
+  # temporal persistence: sessions with the same STI-prioritised genre before an
+  # override is treated as a persistent preference shift
+  persistence_k: 2
+  persistence_gain: 0.3
+  lambda_rel: 0.5
+  lambda_act: 0.3
+  n_case_studies: 12
+  num_workers: 0
+
+quick:
+  subset_fraction: 0.25
+  epochs: 15
+  hidden_dim: 64
+  text_dim: 64
+  seeds: [42, 7]
+  bootstrap_samples: 200
+  batch_size: 128
+
+full:
+  subset_fraction: 1.0
+  epochs: 20
+  hidden_dim: 64
+  text_dim: 128
+  seeds: [42, 7, 123]
+  bootstrap_samples: 1000
+  batch_size: 256

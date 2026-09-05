@@ -1,0 +1,14 @@
+| model                   |   n_parameters |   model_size_mb |   train_time_s |   epochs_run |   inference_time_s |   cpu_inference_ms_per_sample |   gpu_peak_mem_mb |
+|:------------------------|---------------:|----------------:|---------------:|-------------:|-------------------:|------------------------------:|------------------:|
+| LTP-only                |         515597 |           2.062 |          2.45  |          5.5 |             0.018  |                       0.0148  |               nan |
+| STI-only                |         515597 |           2.062 |          3.11  |          7   |             0.032  |                       0.0265  |               nan |
+| Naive fusion            |         515597 |           2.062 |          2.51  |          5.5 |             0.02   |                       0.01645 |               nan |
+| Adaptive fusion         |         526862 |           2.107 |          2.8   |          5.5 |             0.0265 |                       0.0219  |               nan |
+| Sequential (GRU)        |         492877 |           1.972 |          7.97  |          6.5 |             0.041  |                       0.034   |               nan |
+| Conversation-aware      |         476173 |           1.905 |          1.56  |          7   |             0.0195 |                       0.0159  |               nan |
+| AIPA w/o relationship   |         547222 |           2.189 |          5.09  |          5.5 |             0.0455 |                       0.038   |               nan |
+| AIPA w/o counterfactual |         547222 |           2.189 |          5.26  |          6.5 |             0.043  |                       0.0355  |               nan |
+| AIPA w/o clarification  |         547542 |           2.19  |          5.65  |          7   |             0.049  |                       0.04075 |               nan |
+| AIPA w/o persistence    |         547542 |           2.19  |          4.025 |          5.5 |             0.047  |                       0.03875 |               nan |
+| AIPA (rule policy)      |         535378 |           2.142 |          5.46  |          7   |             0.0555 |                       0.04625 |               nan |
+| AIPA (full)             |         547542 |           2.19  |          4.02  |          5.5 |             0.0525 |                       0.0439  |               nan |
