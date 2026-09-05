@@ -98,8 +98,19 @@ MOVIES_HEADER = "movieId,title,genres"
 def _movies_csv_ok(p: Path) -> bool:
     if not p.exists() or p.stat().st_size <= 1_000_000:
         return False
-    with p.open(encoding="utf-8") as f:
-        return f.readline().strip() == MOVIES_HEADER
+    try:
+        with p.open(encoding="utf-8") as f:
+            if f.readline().rstrip("\r\n") != MOVIES_HEADER:
+                return False
+        with p.open("rb") as f:
+            f.seek(-4096, 2)
+            tail = f.read()
+    except (OSError, UnicodeError, ValueError):
+        return False
+    if not tail.endswith(b"\n"):
+        return False
+    last = tail.rstrip(b"\r\n").rsplit(b"\n", 1)[-1]
+    return len(list(csv.reader([last.decode("utf-8", "replace")]))[0]) == 3
 
 
 def dataset_status(cfg: Config) -> pd.DataFrame:
