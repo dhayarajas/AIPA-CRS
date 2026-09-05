@@ -1,0 +1,10 @@
+| relationship_source   | relationship_label   |   count |
+|:----------------------|:---------------------|--------:|
+| synthetic_controlled  | Conflict             |      39 |
+| synthetic_controlled  | Consistent           |      47 |
+| synthetic_controlled  | Override             |      39 |
+| weak_rule             | Complement           |     165 |
+| weak_rule             | Conflict             |      48 |
+| weak_rule             | Consistent           |     514 |
+| weak_rule             | Override             |      14 |
+| weak_rule             | Uncertain            |     336 |

@@ -12,5 +12,6 @@ data/interim/
 data/processed/
 !data/annotations/
 
-# generated artefacts (regenerate with `python -m aipa.pipeline`)
-outputs/
+# quick-run artefacts are committed (regenerate with `python -m aipa.pipeline`);
+# only the large raw per-instance dump is excluded
+outputs/results/per_sample_metrics.csv.gz

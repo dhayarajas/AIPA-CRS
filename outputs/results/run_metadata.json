@@ -1,0 +1,90 @@
+{
+  "run_mode": "quick",
+  "config": {
+    "run_mode": "quick",
+    "dataset_name": "ReDial",
+    "dataset_source": "https://github.com/ReDialData/website/raw/data/redial_dataset.zip",
+    "dataset_path": "data/raw/redial",
+    "processed_path": "data/processed",
+    "interim_path": "data/interim",
+    "external_path": "data/external",
+    "output_path": "outputs",
+    "embedding_model": "tfidf-svd",
+    "text_dim": 64,
+    "hidden_dim": 64,
+    "learning_rate": 0.003,
+    "weight_decay": 1e-05,
+    "batch_size": 128,
+    "epochs": 15,
+    "seed": 42,
+    "seeds": [
+      42,
+      7
+    ],
+    "top_k": [
+      10,
+      20
+    ],
+    "alpha": 0.5,
+    "alpha_grid": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "relationship_threshold": 0.5,
+    "clarification_threshold": 0.6,
+    "device": "cpu",
+    "max_history": 50,
+    "max_context_turns": 6,
+    "history_temporal_decay": 0.9,
+    "injection_rate": 0.15,
+    "injection_intensities": [
+      1,
+      2,
+      3
+    ],
+    "bootstrap_samples": 200,
+    "min_history_for_ltp": 3,
+    "cf_tau": 0.1,
+    "cf_dominance": 1.5,
+    "persistence_k": 2,
+    "persistence_gain": 0.3,
+    "lambda_rel": 0.5,
+    "lambda_act": 0.3,
+    "n_case_studies": 12,
+    "num_workers": 0,
+    "subset_fraction": 0.25
+  },
+  "environment": {
+    "python": "3.12.8",
+    "platform": "Linux-5.15.200-x86_64-with-glibc2.35",
+    "torch": "2.14.0+cpu",
+    "cuda_available": "False",
+    "cuda_version": "None",
+    "gpu": "none",
+    "cpu_count": "8",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.1",
+    "matplotlib": "3.11.1",
+    "seaborn": "0.13.2",
+    "pyyaml": "6.0.3"
+  },
+  "status": {
+    "human_verified_labels": "NOT RUN (no data/annotations/human_verified.csv provided)"
+  },
+  "dataset_source": "https://github.com/ReDialData/website/raw/data/redial_dataset.zip ; genres: https://files.grouplens.org/datasets/movielens/ml-latest.zip",
+  "file_hashes": {
+    "train_data.jsonl": "9beae850d90b7c12dcc26b2ac051ed0e355c2c17",
+    "test_data.jsonl": "b56f0121828a6423186b02779af9e01424bae5ea",
+    "movies_with_mentions.csv": "14006c0c2368e6686c441c2cd7a19e20e2e23a83"
+  },
+  "n_train": 9281,
+  "n_valid": 853,
+  "n_test": 1202,
+  "runtime_s": 103.00810287900003,
+  "timestamp_utc": "2026-09-05T09:16:46.123660+00:00"
+}
