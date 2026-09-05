@@ -8,9 +8,11 @@ label produced here therefore carries an explicit ``relationship_source``:
                              reported as such);
 * ``synthetic_controlled`` - the dialogue context was modified by inserting an
                              English seeker utterance that expresses a controlled
-                             relationship (conflict / override / consistent) and,
-                             for conflict/override, the target item is replaced
-                             by an item matching the injected intent.  These
+                             relationship (conflict / override / consistent /
+                             complement / uncertain) and, for conflict/override/
+                             complement, the target item is replaced by an item
+                             matching the injected intent (uncertain keeps the
+                             original target).  These
                              samples are flagged ``is_synthetic`` and are never
                              mixed silently with natural samples;
 * ``human_verified``       - reserved for manual annotation loaded from
@@ -82,7 +84,19 @@ INJECTION_TEMPLATES = {
     ("Consistent", 1): ["Something {ltp_adj} as usual would be nice.", "A {ltp} movie like always."],
     ("Consistent", 2): ["As always I want a {ltp} movie.", "My usual, a {ltp} film please."],
     ("Consistent", 3): ["Stick with {ltp} like I always do, that is my favorite kind.", "As usual, only {ltp} for me."],
+    # Complement: {sti} is a genre that co-occurs with the habitual genre and does not contradict it
+    ("Complement", 1): ["Maybe {sti} would also be nice.", "I could also go for {sti}."],
+    ("Complement", 2): ["I still like {ltp}, but {sti} would be a nice addition.",
+                        "Something {ltp_adj} is great, and {sti} would go well with that."],
+    ("Complement", 3): ["Ideally {sti} that is also {ltp_adj}, the best of both.",
+                        "I want {sti} with a {ltp} feel to it, mixing both would be perfect."],
+    # Uncertain: vague, no genre cue; target unchanged
+    ("Uncertain", 1): ["I am open to anything really.", "Not sure, anything you like."],
+    ("Uncertain", 2): ["Anything is fine, surprise me.", "Whatever you think is good, I do not mind."],
+    ("Uncertain", 3): ["Honestly I have no idea what I want tonight, just pick something.",
+                       "I really cannot decide, I will watch anything at all."],
 }
+DEFAULT_INJECTION_RELATIONSHIPS = ["Conflict", "Override", "Consistent", "Complement", "Uncertain"]
 GENRE_ADJ = {g: g.lower() for g in GENRES}
 GENRE_ADJ.update({"Sci-Fi": "sci-fi", "Film-Noir": "noir", "Children": "kid friendly", "Comedy": "funny",
                   "Horror": "scary", "Romance": "romantic", "Animation": "animated", "Musical": "musical"})
@@ -163,26 +177,63 @@ def _item_pool(ds: ReDial, instances: list[Instance]) -> dict[str, tuple[list[in
     return pools
 
 
+def _pair_pool(ds: ReDial, instances: list[Instance]) -> dict[frozenset, tuple[list[int], np.ndarray]]:
+    """Popularity-weighted pools of training targets tagged with *both* genres of a pair."""
+    pop: dict[int, int] = {}
+    for x in instances:
+        pop[x.target] = pop.get(x.target, 0) + 1
+    pools: dict[frozenset, tuple[list[int], np.ndarray]] = {}
+    acc: dict[frozenset, list[int]] = {}
+    for m in pop:
+        gl = ds.movie_genres.get(m, [])
+        for i, a in enumerate(gl):
+            for b in gl[i + 1:]:
+                acc.setdefault(frozenset((a, b)), []).append(m)
+    for k, items in acc.items():
+        w = np.array([pop[m] for m in items], float)
+        pools[k] = (items, w / w.sum())
+    return pools
+
+
+def complement_genres(ltp_top: str, ltp_genres: dict[str, float], pair_pools: dict[frozenset, tuple], min_pair: int = 3) -> list[str]:
+    """Genres that co-occur with the habitual genre on >= ``min_pair`` training
+    targets, are not in tension with it and are not already part of the LTP prior."""
+    return [g for g in GENRES
+            if g != ltp_top and frozenset((g, ltp_top)) not in TENSION_PAIRS and ltp_genres.get(g, 0) < 0.05
+            and len(pair_pools.get(frozenset((g, ltp_top)), ([], None))[0]) >= min_pair]
+
+
 def inject_controlled(
     instances: list[Instance], ds: ReDial, cfg: Config, train_pool: list[Instance], seed: int
 ) -> list[Instance]:
     """Return synthetic copies of a random subset of `instances`."""
     rng = np.random.RandomState(seed)
     pools = _item_pool(ds, train_pool)
+    pair_pools = _pair_pool(ds, train_pool)
     out = []
     candidates = [x for x in instances if x.ltp_genres and not x.sti_flags["cold_user"]]
     n = int(round(cfg.injection_rate * len(instances)))
     if not candidates or n == 0:
         return out
     picks = rng.choice(len(candidates), size=min(n, len(candidates)), replace=False)
-    kinds = ["Conflict", "Override", "Consistent"]
+    kinds = list(cfg.values.get("injection_relationships", DEFAULT_INJECTION_RELATIONSHIPS))
+    if not kinds:
+        return out
+    unknown = set(kinds) - set(DEFAULT_INJECTION_RELATIONSHIPS)
+    if unknown:
+        raise ValueError(f"injection_relationships has no templates for {sorted(unknown)}")
     for pi in picks:
         base = candidates[pi]
         rel = kinds[rng.randint(len(kinds))]
         intensity = int(rng.choice(cfg.injection_intensities))
         ltp_top = max(base.ltp_genres.items(), key=lambda kv: kv[1])[0]
-        if rel == "Consistent":
-            sti_g = ltp_top
+        if rel in ("Consistent", "Uncertain"):
+            sti_g = ltp_top if rel == "Consistent" else ""
+        elif rel == "Complement":
+            opts = complement_genres(ltp_top, base.ltp_genres, pair_pools)
+            if not opts:
+                continue
+            sti_g = opts[rng.randint(len(opts))]
         else:
             opts = [g for g in GENRES if frozenset((g, ltp_top)) in TENSION_PAIRS and base.ltp_genres.get(g, 0) < 0.05 and g in pools]
             if not opts:
@@ -197,21 +248,33 @@ def inject_controlled(
         y.context = y.context + [{"role": "Seeker", "text": utt, "movies": []}]
         y.seeker_recent_text = (y.seeker_recent_text + " " + utt).strip()
         y.last_seeker_text = utt
-        hits = genre_hits(y.seeker_recent_text) if rel != "Consistent" else {}
-        boost = 2.0 * intensity
-        sti = {g: v for g, v in base.sti_genres.items()} if rel == "Consistent" else {}
-        sti[sti_g] = sti.get(sti_g, 0.0) + boost
-        for g, v in hits.items():
-            if g != sti_g and rel != "Consistent":
-                sti[g] = sti.get(g, 0.0) + 0.25 * v
-        tot = sum(sti.values())
-        y.sti_genres = {g: v / tot for g, v in sti.items()}
+        if rel == "Uncertain":
+            # the vague utterance replaces every current-intent cue (genre distribution,
+            # recent text and in-dialogue liked items); the target is unchanged
+            y.sti_genres = {}
+            y.seeker_recent_text = utt
+            y.cur_liked_items = []
+        else:
+            hits = genre_hits(y.seeker_recent_text) if rel not in ("Consistent", "Complement") else {}
+            boost = 2.0 * intensity
+            sti = {g: v for g, v in base.sti_genres.items()} if rel in ("Consistent", "Complement") else {}
+            if rel == "Complement":
+                sti[ltp_top] = sti.get(ltp_top, 0.0) + 0.5 * boost
+            sti[sti_g] = sti.get(sti_g, 0.0) + boost
+            for g, v in hits.items():
+                if g != sti_g:
+                    sti[g] = sti.get(g, 0.0) + 0.25 * v
+            tot = sum(sti.values())
+            y.sti_genres = {g: v / tot for g, v in sti.items()}
         y.sti_flags = dict(base.sti_flags)
         y.sti_flags["override_sti"] = float(bool(marker_hits(utt, OVERRIDE_STI_MARKERS)))
         y.sti_flags["override_ltp"] = float(bool(marker_hits(utt, OVERRIDE_LTP_MARKERS)))
         y.sti_flags["negation"] = float(bool(negated_genres(utt)))
         y.sti_flags["request"] = 1.0
-        if rel != "Consistent":
+        if rel == "Complement":
+            items, w = pair_pools[frozenset((sti_g, ltp_top))]
+            y.target = int(items[rng.choice(len(items), p=w)])
+        elif rel in ("Conflict", "Override"):
             items, w = pools[sti_g]
             y.target = int(items[rng.choice(len(items), p=w)])
         y.injection = {

@@ -198,26 +198,48 @@ class CounterfactualDiagnostic(nn.Module):
 
 
 class ArbitrationPolicy(nn.Module):
-    """Learned policy: action distribution from relationship posterior, evidence, and CF features."""
+    """Learned policy: action distribution from relationship posterior, evidence, and CF features.
 
-    def __init__(self, hidden: int, use_rel: bool, use_cf: bool, use_clar: bool):
+    With ``residual_gate`` the policy additionally emits a scalar logit offset
+    that is added to the action-implied LTP weight (in logit space), making the
+    effective alpha action-conditioned but instance-adaptive.  The gate's output
+    layer is zero-initialised so training starts from the pure action weights, and
+    it reads detached features so it cannot pull the shared encoders / relationship
+    head away from their own objectives.
+    """
+
+    def __init__(self, hidden: int, use_rel: bool, use_cf: bool, use_clar: bool, residual_gate: bool = False):
         super().__init__()
         self.use_rel, self.use_cf, self.use_clar = use_rel, use_cf, use_clar
         d = 2 * hidden + 2 * N_GENRES + N_FLAGS + 1 + (len(RELATIONSHIPS) if use_rel else 0) + (5 if use_cf else 0)
         self.net = mlp(d, hidden, len(ACTIONS))
+        self.gate = None
+        if residual_gate:
+            self.gate = mlp(d, hidden, 1)
+            nn.init.zeros_(self.gate[-1].weight)
+            nn.init.zeros_(self.gate[-1].bias)
 
-    def forward(self, h_ltp, h_sti, batch, rel_probs=None, cf=None) -> torch.Tensor:
+    def features(self, h_ltp, h_sti, batch, rel_probs=None, cf=None) -> torch.Tensor:
         cos = F.cosine_similarity(h_ltp, h_sti, dim=-1, eps=1e-6).unsqueeze(-1)
         parts = [h_ltp, h_sti, batch["ltp_genres"], batch["sti_genres"], batch["flags"], cos]
         if self.use_rel:
             parts.append(rel_probs)
         if self.use_cf:
             parts.append(cf)
-        logits = self.net(torch.cat(parts, -1))
+        return torch.cat(parts, -1)
+
+    def forward(self, h_ltp, h_sti, batch, rel_probs=None, cf=None) -> torch.Tensor:
+        return self.action_logits(self.features(h_ltp, h_sti, batch, rel_probs, cf))
+
+    def action_logits(self, feats: torch.Tensor) -> torch.Tensor:
+        logits = self.net(feats)
         if not self.use_clar:
             logits = logits.clone()
             logits[:, ACT2ID["Ask_Clarification"]] = -1e9
         return logits
+
+    def residual(self, feats: torch.Tensor) -> torch.Tensor | None:
+        return None if self.gate is None else self.gate(feats.detach()).squeeze(-1)
 
 
 def rule_policy(rel_probs: torch.Tensor, batch: dict, threshold: float, use_clar: bool) -> torch.Tensor:
@@ -244,7 +266,8 @@ def rule_policy(rel_probs: torch.Tensor, batch: dict, threshold: float, use_clar
 
 class AIPA(nn.Module):
     def __init__(self, content: torch.Tensor, text_dim: int, hidden: int, max_history: int, variant: Variant,
-                 rel_threshold: float = 0.5, cf_tau: float = 0.1, cf_dominance: float = 1.5, top_k: int = 10):
+                 rel_threshold: float = 0.5, cf_tau: float = 0.1, cf_dominance: float = 1.5, top_k: int = 10,
+                 learned_action_weights: bool = False, residual_gate: bool = False):
         super().__init__()
         self.variant = variant
         self.items = ItemTower(content, hidden)
@@ -256,8 +279,21 @@ class AIPA(nn.Module):
         if variant.fusion == "adaptive":
             self.gate = mlp(2 * hidden + 2 * N_GENRES + N_FLAGS, hidden, 1)
         if variant.fusion == "aipa" and variant.learned_policy:
-            self.policy = ArbitrationPolicy(hidden, variant.use_rel, variant.use_cf, variant.use_clar)
-        self.register_buffer("action_weights", ACTION_WEIGHTS.clone())
+            self.policy = ArbitrationPolicy(hidden, variant.use_rel, variant.use_cf, variant.use_clar,
+                                            residual_gate=residual_gate)
+        self.learned_action_weights = learned_action_weights
+        if learned_action_weights:
+            # two logits per action; softmax reproduces ACTION_WEIGHTS at initialisation
+            self.action_logits = nn.Parameter(ACTION_WEIGHTS.clamp(min=1e-4).log())
+        else:
+            self.register_buffer("action_weights_fixed", ACTION_WEIGHTS.clone())
+
+    @property
+    def action_weights(self) -> torch.Tensor:
+        """[n_actions, 2] (w_ltp, w_sti) rows summing to one."""
+        if self.learned_action_weights:
+            return self.action_logits.softmax(-1)
+        return self.action_weights_fixed
 
     def _score(self, h: torch.Tensor, items: torch.Tensor) -> torch.Tensor:
         return score_items(h, items, self.items.bias)
@@ -289,12 +325,19 @@ class AIPA(nn.Module):
             s_naive = 0.5 * (s_ltp + s_sti)
             cf = self.cf.features(s_naive, s_sti, s_ltp) if v.use_cf else None
             out["cf"] = cf if cf is not None else self.cf.features(s_naive, s_sti, s_ltp)
+            gate = None
             if v.learned_policy:
-                act_logits = self.policy(h_ltp, h_sti, batch, rel_probs.detach() if v.use_rel else None, cf)
+                feats = self.policy.features(h_ltp, h_sti, batch, rel_probs.detach() if v.use_rel else None, cf)
+                act_logits = self.policy.action_logits(feats)
+                gate = self.policy.residual(feats)
             else:
                 act_logits = rule_policy(rel_probs.detach(), batch, self.rel_threshold, v.use_clar)
             out["act_logits"] = act_logits
             w = act_logits.softmax(-1) @ self.action_weights
+            if gate is not None:
+                a = torch.sigmoid(torch.logit(w[:, 0].clamp(1e-4, 1 - 1e-4)) + gate)
+                w = torch.stack([a, 1 - a], -1)
+                out["gate"] = gate
         out["w_ltp"], out["w_sti"] = w[:, 0], w[:, 1]
         out["scores"] = w[:, :1] * s_ltp + w[:, 1:] * s_sti
         return out
@@ -463,8 +506,9 @@ def build_model(name: str, content: torch.Tensor, cfg) -> nn.Module:
     if name == "KBRD-style":
         return KBRDBaseline(pooling=cfg.values.get("kbrd_pooling", "attention"), **kw)
     return AIPA(variant=VARIANTS[name], rel_threshold=cfg.relationship_threshold, cf_tau=cfg.cf_tau,
-                cf_dominance=cfg.cf_dominance,
-                top_k=min(cfg.top_k), **kw)
+                cf_dominance=cfg.cf_dominance, top_k=min(cfg.top_k),
+                learned_action_weights=bool(cfg.values.get("learned_action_weights", False)),
+                residual_gate=bool(cfg.values.get("residual_gate", False)), **kw)
 
 
 # --------------------------------------------------------------------------

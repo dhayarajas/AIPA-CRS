@@ -74,6 +74,30 @@ common:
   criteria_unnecessary_clarification_max: 0.10
   lambda_rel: 0.5
   lambda_act: 0.3
+  # arbitration: learn the per-action (w_ltp, w_sti) mixing weights (softmax over
+  # 2 logits per action, initialised to the fixed 0.5/0.5, 0.85/0.15, ... table) and
+  # optionally let the policy add an instance-level residual to the fused alpha.
+  # Set both to false for the fixed-table behaviour.  (residual_gate lowered
+  # validation relationship macro-F1 by ~0.08 in quick mode, so it stays off.)
+  learned_action_weights: true
+  residual_gate: false
+  # recommendation loss: softmax | sampled_softmax | bpr (in-batch + n_negatives uniform negatives)
+  rec_loss: softmax
+  n_negatives: 256
+  # >1 up-weights the recommendation loss on Conflict/Override training instances
+  # (natural weak-rule or synthetic); 1.0 = off
+  conflict_loss_weight: 1.0
+  rel_label_smoothing: 0.0
+  # confidence-filtered self-training of the relationship head (off by default):
+  # from self_train_start_epoch on, weak-rule labels with confidence < self_train_min_conf
+  # are replaced by the model's prediction when its max-probability >= self_train_threshold
+  self_train: false
+  self_train_start_epoch: 3
+  self_train_min_conf: 0.6
+  self_train_threshold: 0.9
+  # relationships with controlled synthetic injections (drop Complement/Uncertain for
+  # the original three-class injection)
+  injection_relationships: [Conflict, Override, Consistent, Complement, Uncertain]
   # stronger baselines trained on identical inputs (same losses / seeds / epochs).
   # SASRec: causal self-attention over history + in-dialogue liked items.
   sasrec_blocks: 2
@@ -98,6 +122,12 @@ quick:
   seeds: [42, 7]
   bootstrap_samples: 200
   batch_size: 128
+  # same validation-selected training settings as `full` (see there); rec_loss stays softmax
+  lambda_rel: 1.0
+  lambda_act: 0.6
+  conflict_loss_weight: 2.0
+  rel_label_smoothing: 0.1
+  self_train: true
 
 full:
   subset_fraction: 1.0
@@ -108,3 +138,19 @@ full:
   seeds: [42, 7, 123, 2024, 31337]
   bootstrap_samples: 1000
   batch_size: 256
+  # Selected on the VALIDATION split only (quick mode, seeds 42+7, AIPA (full)) with
+  # scripts/tune_lambdas.py; selection metric: natural validation Hit@10, with the
+  # weak-rule validation relationship macro-F1 / conflict-subset Hit@10 reported
+  # alongside (sweep CSVs: outputs/results/validation_sweep_*.csv).  The test split
+  # was never used.
+  #   rec_loss: softmax 0.123 > sampled_softmax 0.072 > bpr 0.046 (valid Hit@10)
+  #   lambda grid {0.5,1.0}x{0.1,0.6}: 1.0/0.6 best valid Hit@10 (0.128; all within 0.002)
+  #   conflict_loss_weight 2.0 and rel_label_smoothing 0.1 raised conflict-subset
+  #   valid Hit@10 (0.092 -> 0.109..0.121) and Override-F1 at unchanged Hit@10;
+  #   self_train raised valid macro-F1 by ~0.01 at unchanged Hit@10.
+  rec_loss: softmax
+  lambda_rel: 1.0
+  lambda_act: 0.6
+  conflict_loss_weight: 2.0
+  rel_label_smoothing: 0.1
+  self_train: true

@@ -12,10 +12,17 @@ from aipa.config import load_config
 from aipa.data import GENRES as ALL_GENRES
 from aipa.data import Dialogue, ReDial
 from aipa.evaluate import arbitration_metrics, bootstrap_ci, paired_test, per_sample_ranking, relationship_metrics
-from aipa.labeling import inject_controlled, label_all
-from aipa.models import BASELINE_NAMES, CounterfactualDiagnostic, build_model, clarification_question, left_align
+from aipa.labeling import REL2ACTION, complement_genres, inject_controlled, label_all
+from aipa.models import (
+    ACTION_WEIGHTS,
+    BASELINE_NAMES,
+    CounterfactualDiagnostic,
+    build_model,
+    clarification_question,
+    left_align,
+)
 from aipa.preprocess import ItemIndex, SeekerMemory, build_instances, marker_hits, tensorise
-from aipa.train import label_tensors
+from aipa.train import instance_weights, label_tensors, rec_loss, self_train_relabel
 
 GENRES = ["Comedy", "Horror", "Drama", "Action", "Romance", "War"]
 
@@ -102,9 +109,41 @@ def test_synthetic_injection_is_marked(mini, cfg):
     labels = label_all(syn, cfg)
     for x, lab in zip(syn, labels):
         assert x.is_synthetic and lab.source == "synthetic_controlled"
-        assert x.injection["relationship"] == lab.relationship in ("Conflict", "Override", "Consistent")
+        assert x.injection["relationship"] == lab.relationship in RELATIONSHIPS
+        assert lab.action == REL2ACTION[lab.relationship]
         assert x.injection["intensity"] in cfg.injection_intensities
         assert x.injection["utterance"] in x.seeker_recent_text
+
+
+def test_five_class_injection(mini, cfg):
+    inst = build_instances(mini, cfg)
+    base = [x for x in inst["train"] if x.ltp_genres and not x.sti_flags["cold_user"]]
+    assert base
+    c = load_config("quick")
+    c.values.update(cfg.values)
+    seen = {}
+    for rel in ["Uncertain", "Consistent", "Conflict"]:
+        c.values["injection_relationships"] = [rel]
+        syn = inject_controlled(base * 4, mini, c, inst["train"], seed=1)
+        assert syn and all(y.injection["relationship"] == rel for y in syn)
+        seen[rel] = syn
+    for y in seen["Uncertain"]:
+        assert y.sti_genres == {} and y.target == y.injection["original_target"]
+        assert y.injection["injected_genre"] == "" and y.sample_id.startswith("syn/unc")
+        # no current-intent evidence survives from the original instance
+        assert y.seeker_recent_text == y.last_seeker_text == y.injection["utterance"] and y.cur_liked_items == []
+    for y in seen["Conflict"]:
+        assert y.target != y.injection["original_target"] or len(mini.movie_genres) < 2
+    # the mini corpus has single-genre movies, so Complement has no co-occurring genre to inject
+    c.values["injection_relationships"] = ["Complement"]
+    assert inject_controlled(base, mini, c, inst["train"], seed=1) == []
+    pair_pools = {frozenset(("Comedy", "Romance")): ([1, 2, 3], np.ones(3) / 3), frozenset(("Comedy", "Horror")): ([4, 5, 6], None)}
+    assert complement_genres("Comedy", {"Comedy": 1.0}, pair_pools) == ["Romance"]  # Horror is a tension pair
+    c.values["injection_relationships"] = []
+    assert inject_controlled(base, mini, c, inst["train"], seed=1) == []
+    c.values["injection_relationships"] = ["Nope"]
+    with pytest.raises(ValueError):
+        inject_controlled(base, mini, c, inst["train"], seed=1)
 
 
 def test_marker_hits_handles_punctuation():
@@ -142,6 +181,77 @@ def test_counterfactual_driver_rule():
 def test_clarification_is_english_and_mentions_genres():
     q = clarification_question({"Drama": 0.7}, {"Horror": 1.0}, "Conflict")
     assert "drama" in q.lower() and "horror" in q.lower() and q.endswith("?")
+
+
+def test_rec_losses_and_conflict_weights():
+    torch.manual_seed(0)
+    scores = torch.randn(6, 50)
+    scores[:, 0] = -1e9
+    target = torch.tensor([3, 3, 7, 9, 11, 13])
+    full = rec_loss(scores, target, "softmax")
+    assert full.shape == (6,) and torch.allclose(full, torch.nn.functional.cross_entropy(scores, target, reduction="none"))
+    for mode in ["sampled_softmax", "bpr"]:
+        loss = rec_loss(scores, target, mode, n_negatives=16)
+        assert loss.shape == (6,) and torch.isfinite(loss).all() and (loss >= 0).all()
+    # a positive far above every other score drives both sampled losses to ~0
+    easy = scores.clone()
+    easy[torch.arange(6), target] = 50.0
+    assert rec_loss(easy, target, "sampled_softmax", 16).max() < 1e-3 and rec_loss(easy, target, "bpr", 16).max() < 1e-3
+    with pytest.raises(ValueError):
+        rec_loss(scores, target, "hinge")
+    rel = torch.tensor([RELATIONSHIPS.index(r) for r in ["Conflict", "Consistent", "Override", "Uncertain"]])
+    assert torch.equal(instance_weights(rel, 1.0), torch.ones(4))
+    w = instance_weights(rel, 3.0)
+    assert torch.isclose(w.mean(), torch.tensor(1.0)) and w[0] == w[2] > w[1] == w[3]
+
+
+def test_learned_action_weights_and_residual_gate(mini, cfg):
+    from aipa.preprocess import TextEncoder, build_item_index
+
+    inst = build_instances(mini, cfg)
+    enc = TextEncoder(cfg).fit([x.seeker_recent_text for x in inst["train"]] + list(mini.movie_titles.values()))
+    index = build_item_index(mini, enc)
+    X = tensorise(inst["train"], enc, index, cfg)
+    c = load_config("quick")
+    c.values.update(cfg.values, learned_action_weights=False, residual_gate=False)
+    fixed = build_model("AIPA (full)", index.content, c)
+    assert not any(n == "action_logits" for n, _ in fixed.named_parameters())
+    assert torch.equal(fixed.action_weights, ACTION_WEIGHTS)
+    c.values.update(learned_action_weights=True, residual_gate=True)
+    torch.manual_seed(0)
+    learned = build_model("AIPA (full)", index.content, c)
+    assert torch.allclose(learned.action_weights, ACTION_WEIGHTS, atol=1e-3)
+    assert learned.action_logits.requires_grad and learned.policy.gate is not None
+    out = learned(X)
+    # zero-initialised gate: the fused alpha equals the action-implied alpha at initialisation
+    a_act = (out["act_logits"].softmax(-1) @ learned.action_weights)[:, 0]
+    assert torch.allclose(out["w_ltp"], a_act, atol=1e-4) and torch.allclose(out["gate"], torch.zeros_like(out["gate"]))
+    assert torch.allclose(out["w_ltp"] + out["w_sti"], torch.ones_like(out["w_ltp"]))
+    torch.nn.functional.cross_entropy(out["scores"], X["target"]).backward()
+    assert learned.action_logits.grad is not None and learned.action_logits.grad.abs().sum() > 0
+    assert learned.policy.gate[-1].weight.grad.abs().sum() > 0
+
+
+def test_self_training_relabels_only_low_confidence_weak_labels(mini, cfg):
+    from aipa.preprocess import TextEncoder, build_item_index
+
+    inst = build_instances(mini, cfg)
+    enc = TextEncoder(cfg).fit([x.seeker_recent_text for x in inst["train"]] + list(mini.movie_titles.values()))
+    index = build_item_index(mini, enc)
+    X = tensorise(inst["train"], enc, index, cfg)
+    Y = label_tensors(label_all(inst["train"], cfg))
+    Y["weak"] = torch.ones_like(Y["weak"])
+    Y["conf"] = torch.tensor([0.5] * (len(Y["conf"]) - 1) + [1.0])
+    model = build_model("AIPA (full)", index.content, cfg)
+    new, n = self_train_relabel(model, X, Y, cfg, min_conf=0.6, threshold=0.0)
+    assert n == len(Y["conf"]) - 1  # every low-confidence label is eligible at threshold 0
+    assert torch.equal(new["rel"][-1:], Y["rel"][-1:]) and torch.equal(new["conf"][-1:], Y["conf"][-1:])
+    for r, a in zip(new["rel"][:-1].tolist(), new["act"][:-1].tolist()):
+        assert ACTIONS[a] == REL2ACTION[RELATIONSHIPS[r]]
+    none, n0 = self_train_relabel(model, X, Y, cfg, min_conf=0.6, threshold=1.01)
+    assert n0 == 0 and torch.equal(none["rel"], Y["rel"])
+    Y["weak"] = torch.zeros_like(Y["weak"])
+    assert self_train_relabel(model, X, Y, cfg, min_conf=0.6, threshold=0.0)[1] == 0
 
 
 def test_item_text_enriches_title_with_genres(mini):
