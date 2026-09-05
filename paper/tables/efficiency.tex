@@ -2,17 +2,19 @@
 \toprule
 Model & Parameters & Size (MB) & Train (s) & CPU inf.\ (ms/sample) \\
 \midrule
-LTP-only & 515,597 & 2.06 & 2.5 & 0.015 \\
-STI-only & 515,597 & 2.06 & 3.1 & 0.026 \\
-Naive fusion & 515,597 & 2.06 & 2.5 & 0.016 \\
-Adaptive fusion & 526,862 & 2.11 & 2.8 & 0.022 \\
-Sequential (GRU) & 492,877 & 1.97 & 8.0 & 0.034 \\
-Conversation-aware & 476,173 & 1.91 & 1.6 & 0.016 \\
-AIPA w/o relationship & 547,222 & 2.19 & 5.1 & 0.038 \\
-AIPA w/o counterfactual & 547,222 & 2.19 & 5.3 & 0.035 \\
-AIPA w/o clarification & 547,542 & 2.19 & 5.7 & 0.041 \\
-AIPA w/o persistence & 547,542 & 2.19 & 4.0 & 0.039 \\
-AIPA (rule policy) & 535,378 & 2.14 & 5.5 & 0.046 \\
-AIPA (full) & 547,542 & 2.19 & 4.0 & 0.044 \\
+LTP-only & 515,605 & 2.06 & 3.7 & 0.032 \\
+STI-only & 515,605 & 2.06 & 6.0 & 0.047 \\
+Naive fusion & 515,605 & 2.06 & 3.6 & 0.031 \\
+Adaptive fusion & 526,870 & 2.11 & 14.8 & 0.062 \\
+Sequential (GRU) & 492,877 & 1.97 & 19.1 & 0.048 \\
+Conversation-aware & 476,173 & 1.91 & 4.9 & 0.013 \\
+SASRec & 526,413 & 2.11 & 55.6 & 0.176 \\
+KBRD-style & 477,814 & 1.91 & 4.3 & 0.021 \\
+AIPA w/o relationship & 547,230 & 2.19 & 11.0 & 0.071 \\
+AIPA w/o counterfactual & 547,230 & 2.19 & 14.9 & 0.068 \\
+AIPA w/o clarification & 547,550 & 2.19 & 24.1 & 0.096 \\
+AIPA w/o persistence & 547,550 & 2.19 & 12.3 & 0.073 \\
+AIPA (rule policy) & 535,386 & 2.14 & 14.4 & 0.085 \\
+AIPA (full) & 547,550 & 2.19 & 11.9 & 0.074 \\
 \bottomrule
 \end{tabular}

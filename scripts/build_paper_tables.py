@@ -55,8 +55,11 @@ def write(name: str, body: str) -> None:
     print("wrote", OUT / f"{name}.tex")
 
 
-def ranking_table(csv: str, name: str, models=MODEL_ORDER, ci: bool = True) -> None:
-    d = present(pd.read_csv(RES / csv).set_index("model"), models)
+def ranking_table(csv: str, name: str, models=MODEL_ORDER, ci: bool = True, subset: str | None = None) -> None:
+    d = pd.read_csv(RES / csv)
+    if subset is not None:
+        d = d[d["subset"] == subset]
+    d = present(d.set_index("model"), models)
     rows, sep = [], last_baseline(d.index)
     for m, r in d.iterrows():
         hit = f"{r['Hit@10_mean']:.3f}"
@@ -73,13 +76,14 @@ def ranking_table(csv: str, name: str, models=MODEL_ORDER, ci: bool = True) -> N
 
 
 ranking_table("table_overall_natural.csv", "overall_natural")
-ranking_table("table_conflict_natural.csv", "conflict_natural")
+ranking_table("table_conflict_natural.csv", "conflict_natural", subset="strict")
+ranking_table("table_conflict_natural.csv", "conflict_natural_broad", subset="broad")
 ranking_table("table_conflict_synthetic.csv", "conflict_synthetic")
 ranking_table("table_overall_synthetic.csv", "overall_synthetic", ci=False)
 
 # significance: AIPA (full) vs every other model, Hit@10, three subsets
 sig = pd.read_csv(RES / "table_significance.csv").query("treatment == 'AIPA (full)' and metric == 'Hit@10'")
-SIG_SUBSETS = ["natural", "conflict_natural", "conflict_synthetic"]
+SIG_SUBSETS = ["natural", "conflict_natural_strict", "conflict_synthetic"]
 sig_n = {s: int(sig.loc[sig.subset == s, "n"].iloc[0]) for s in SIG_SUBSETS}
 rows, sep = [], last_baseline(sig.control)
 for m in [x for x in MODEL_ORDER[:-1] if x in set(sig.control)]:
@@ -95,7 +99,7 @@ for m in [x for x in MODEL_ORDER[:-1] if x in set(sig.control)]:
     rows.append(" & ".join(cells) + " \\\\")
     if m == sep:
         rows.append("\\midrule")
-write("significance", "\\begin{tabular}{l ccc ccc ccc}\n\\toprule\n& \\multicolumn{3}{c}{Natural (all, $n$=" + str(sig_n["natural"]) + ")} & \\multicolumn{3}{c}{Natural conflict ($n$=" + str(sig_n["conflict_natural"]) + ")} & \\multicolumn{3}{c}{Synthetic conflict ($n$=" + str(sig_n["conflict_synthetic"]) + ")} \\\\\n\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}\nControl & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
+write("significance", "\\begin{tabular}{l ccc ccc ccc}\n\\toprule\n& \\multicolumn{3}{c}{Natural (all, $n$=" + str(sig_n["natural"]) + ")} & \\multicolumn{3}{c}{Natural conflict ($n$=" + str(sig_n["conflict_natural_strict"]) + ")} & \\multicolumn{3}{c}{Synthetic conflict ($n$=" + str(sig_n["conflict_synthetic"]) + ")} \\\\\n\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}\nControl & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
 # relationship classification (mean over seeds)
 rel = pd.read_csv(RES / "table_relationship.csv")
@@ -104,9 +108,8 @@ rows = []
 for m in [x for x in MODEL_ORDER if x.startswith("AIPA")]:
     for sub in ["natural", "synthetic"]:
         r = rel.query("model == @m and subset == @sub").iloc[0]
-        absent = "--" if sub == "synthetic" else None
-        rows.append(" & ".join([tex(m), sub, f3(r["accuracy"]), f3(r["macro_f1"]), f3(r["weighted_f1"]),
-                                absent or f3(r["F1_Complement"]), f3(r["F1_Consistent"]), f3(r["F1_Conflict"]), f3(r["F1_Override"]), absent or f3(r["F1_Uncertain"])]) + " \\\\")
+        rows.append(" & ".join([tex(m), sub, f3(r["accuracy"]), f3(r["macro_f1"]), f3(r["weighted_f1"])]
+                               + [f3(r[f"F1_{c}"]) for c in ["Complement", "Consistent", "Conflict", "Override", "Uncertain"]]) + " \\\\")
 write("relationship", "\\begin{tabular}{llcccccccc}\n\\toprule\nModel & Subset & Acc. & Macro-F1 & W-F1 & Compl. & Consist. & Confl. & Overr. & Uncert. \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
 # arbitration (mean over seeds, natural + synthetic)
@@ -163,6 +166,7 @@ write("cases", "\\begin{tabular}{@{}c p{5.6cm} p{2.6cm} p{2.6cm} p{2.0cm} l c l 
 meta = json.load(open(RES / "run_metadata.json"))
 cfg = meta["config"]
 inst = pd.read_csv(RES / "test_instances_meta.csv")
+sizes = pd.read_csv(RES / "table_conflict_subset_sizes.csv").set_index("subset")["n"]
 macros = {
     "nSeeds": len(cfg["seeds"]), "nEpochs": cfg["epochs"], "hiddenDim": cfg["hidden_dim"], "textDim": cfg["text_dim"],
     "subsetPct": int(round(100 * cfg["subset_fraction"])), "nBoot": cfg["bootstrap_samples"], "lr": cfg["learning_rate"],
@@ -171,5 +175,10 @@ macros = {
     "injRate": cfg["injection_rate"], "nTestNat": int((~inst["is_synthetic"]).sum()), "nTestSyn": int(inst["is_synthetic"].sum()),
     "nTrain": int(lab_tr["count"].sum()), "torchVersion": meta["environment"]["torch"], "pythonVersion": meta["environment"]["python"],
     "cpuCount": meta["environment"]["cpu_count"],
+    "lambdaRel": cfg["lambda_rel"], "lambdaAct": cfg["lambda_act"], "conflictLossWeight": cfg["conflict_loss_weight"],
+    "relLabelSmoothing": cfg["rel_label_smoothing"], "selfTrainStart": cfg["self_train_start_epoch"],
+    "selfTrainMinConf": cfg["self_train_min_conf"], "selfTrainThreshold": cfg["self_train_threshold"],
+    "nConflictStrict": int(sizes["strict"]), "nConflictBroad": int(sizes["broad"]), "nConflictSyn": int(sizes["synthetic_conflict"]),
+    "disagreementConfMin": cfg["disagreement_conf_min"], "disagreementJsMin": cfg["disagreement_js_min"],
 }
 write("macros", "\n".join(f"\\newcommand{{\\{k}}}{{{tex(v)}}}" for k, v in macros.items()) + "\n")
