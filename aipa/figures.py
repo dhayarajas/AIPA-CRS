@@ -10,8 +10,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import seaborn as sns  # noqa: E402
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
+from matplotlib.path import Path as MplPath  # noqa: E402
 
-from . import RELATIONSHIPS  # noqa: E402
+from . import ACTIONS, RELATIONSHIPS  # noqa: E402
+from .config import Config, load_config  # noqa: E402
 from .experiments import MODEL_ORDER, PRIMARY, Results  # noqa: E402
 
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.1)
@@ -231,39 +234,349 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         sns.barplot(data=d, y="model", x="cpu_inference_ms_per_sample", ax=ax[1], color=PALETTE[1])
         ax[1].set_title("Inference time per test instance (ms)")
         reg("fig13_efficiency", _save(fig, out, "fig13_efficiency"))
-    # 14. architecture diagram
-    reg("fig00_architecture", _save(architecture_diagram(), out, "fig00_architecture"))
+    # 14. architecture diagram (two-column wide + single-column compact variant)
+    reg("fig00_architecture", _save(architecture_diagram(cfg=res.cfg), out, "fig00_architecture"))
+    reg("fig00_architecture_compact",
+        _save(architecture_diagram(compact=True, cfg=res.cfg), out, "fig00_architecture_compact"))
     return made
 
 
-def architecture_diagram():
-    fig, ax = plt.subplots(figsize=(13, 6))
+# --------------------------------------------------------------------------
+# architecture diagram
+# --------------------------------------------------------------------------
+# Drawing coordinates are hundredths of an inch, so one unit = 0.01 in and all
+# font sizes below are the sizes the reader sees at the stated figure width.
+
+ARCH_STYLE = {
+    "inputs": {"box": "#dce9f7", "panel": "#f2f7fd", "edge": "#3f78ad", "text": "#123a5e"},
+    "encoders": {"box": "#dff0dd", "panel": "#f3faf2", "edge": "#4e8f57", "text": "#1d4a25"},
+    "arbitration": {"box": "#fde3c9", "panel": "#fef7f0", "edge": "#c07f34", "text": "#7a4708"},
+    "output": {"box": "#e7e0f4", "panel": "#f7f4fc", "edge": "#7d66b0", "text": "#3b2a63"},
+    "training": {"box": "#e9e9e9", "panel": "#f6f6f6", "edge": "#7d7d7d", "text": "#2f2f2f"},
+}
+LTP_COLOR = "#1f6fb2"
+STI_COLOR = "#b8761c"
+FLOW_COLOR = "#4a4a4a"
+PERSIST_COLOR = "#6b4fa1"
+PT = 100.0 / 72.0  # drawing units per typographic point
+
+
+def _arch_canvas(width: float, height: float):
+    fig, ax = plt.subplots(figsize=(width / 100.0, height / 100.0))
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    ax.set_xlim(0, width)
+    ax.set_ylim(0, height)
+    ax.set_aspect("equal")
     ax.axis("off")
-    boxes = {
-        "hist": (0.02, 0.70, 0.18, 0.18, "Cross-session history\n(earlier ReDial sessions:\nliked/seen movies, preference statements)"),
-        "ctx": (0.02, 0.12, 0.18, 0.18, "Current dialogue context\n(recent seeker turns, in-dialogue items,\ngenre cues, lexical markers)"),
-        "ltp": (0.26, 0.70, 0.14, 0.18, "LTP encoder\nh_LTP"),
-        "sti": (0.26, 0.12, 0.14, 0.18, "STI encoder\nh_STI"),
-        "rel": (0.46, 0.55, 0.16, 0.18, "Relationship classifier\nConsistent / Complement /\nConflict / Override / Uncertain"),
-        "cf": (0.46, 0.27, 0.16, 0.18, "Counterfactual driver\ndiagnostic (mask LTP / STI)\nΔ top-K, driver label"),
-        "arb": (0.68, 0.41, 0.14, 0.18, "Arbitration policy\nFuse / Prioritize_LTP /\nPrioritize_STI / Ask"),
-        "rec": (0.86, 0.60, 0.12, 0.16, "Fused ranking\nw_LTP·s_LTP + w_STI·s_STI"),
-        "clar": (0.86, 0.22, 0.12, 0.16, "Clarification\nquestion (English)"),
-        "per": (0.68, 0.08, 0.14, 0.14, "Persistence tracker\n(temporary override vs\npersistent shift)"),
-    }
-    for k, (x, y, w, h, t) in boxes.items():
-        color = "#dbe9f6" if k in ("hist", "ctx") else ("#fde2c8" if k in ("rel", "cf", "arb") else "#e3f2e1")
-        ax.add_patch(plt.Rectangle((x, y), w, h, fc=color, ec="black", lw=1))
-        ax.text(x + w / 2, y + h / 2, t, ha="center", va="center", fontsize=8.5)
+    ax.set_facecolor("white")
+    return fig, ax
 
-    def arrow(a, b, dy_a=0.5, dy_b=0.5):
-        xa, ya, wa, ha, _ = boxes[a]
-        xb, yb, wb, hb, _ = boxes[b]
-        ax.annotate("", xy=(xb, yb + hb * dy_b), xytext=(xa + wa, ya + ha * dy_a), arrowprops=dict(arrowstyle="->", lw=1.2))
 
-    for args in [("hist", "ltp"), ("ctx", "sti"), ("ltp", "rel", 0.5, 0.8), ("sti", "rel", 0.5, 0.2),
-                 ("ltp", "cf", 0.3, 0.8), ("sti", "cf", 0.7, 0.2), ("rel", "arb", 0.5, 0.8), ("cf", "arb", 0.5, 0.2),
-                 ("arb", "rec", 0.7, 0.5), ("arb", "clar", 0.3, 0.5), ("per", "arb", 0.5, 0.1)]:
-        arrow(*args)
-    ax.set_title("AIPA-CRS architecture (this implementation)", fontsize=12)
+def _arch_panel(ax, rect, group, number, title, fs=6.0):
+    x, y, w, h = rect
+    st = ARCH_STYLE[group]
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=5",
+                                fc=st["panel"], ec=st["edge"], lw=0.7, zorder=0))
+    r = fs * PT * 0.72
+    cx, cy = x + 4 + r, y + h - 4 - r
+    ax.add_patch(plt.Circle((cx, cy), r, fc=st["edge"], ec="none", zorder=3))
+    ax.text(cx, cy, str(number), ha="center", va="center", color="white", fontsize=fs - 1.0,
+            fontweight="bold", zorder=4)
+    ax.text(cx + r + 3, cy, title, ha="left", va="center", fontsize=fs, fontweight="bold",
+            color=st["text"], zorder=3)
+
+
+def _arch_box(ax, rect, group, title, body="", shape="", fs=(5.6, 4.8, 4.3), pad=3.0):
+    x, y, w, h = rect
+    st = ARCH_STYLE[group]
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=3",
+                                fc=st["box"], ec=st["edge"], lw=0.6, zorder=2))
+    title_h = title.count("\n") + 1
+    top = y + h - pad
+    ax.text(x + w / 2, top, title, ha="center", va="top", fontsize=fs[0], fontweight="bold",
+            color=st["text"], linespacing=1.15, zorder=3)
+    bottom = y + pad
+    if shape:
+        ax.text(x + w / 2, bottom, shape, ha="center", va="bottom", fontsize=fs[2], style="italic",
+                color="#33383d", zorder=3)
+        bottom += (shape.count("\n") + 1) * fs[2] * PT * 1.2
+    if body:
+        top -= title_h * fs[0] * PT * 1.25
+        ax.text(x + w / 2, (top + bottom) / 2, body, ha="center", va="center", fontsize=fs[1],
+                color="#1c1c1c", linespacing=1.3, zorder=3)
+
+
+def _arch_arrow(ax, points, color=FLOW_COLOR, ls="-", lw=0.7, rad=0.0, zorder=5, head=1.0):
+    style = f"-|>,head_length={0.55 * head},head_width={0.32 * head}"
+    if len(points) == 2:
+        arrow = FancyArrowPatch(points[0], points[1], arrowstyle=style, mutation_scale=10,
+                                connectionstyle=f"arc3,rad={rad}", color=color, lw=lw, ls=ls,
+                                shrinkA=0, shrinkB=0, zorder=zorder)
+    else:
+        path = MplPath(points, [MplPath.MOVETO] + [MplPath.LINETO] * (len(points) - 1))
+        arrow = FancyArrowPatch(path=path, arrowstyle=style, mutation_scale=10, color=color,
+                                lw=lw, ls=ls, shrinkA=0, shrinkB=0, zorder=zorder)
+    ax.add_patch(arrow)
+    return arrow
+
+
+def _arch_label(ax, x, y, text, fs=4.2, color=FLOW_COLOR, ha="center", va="center", rotation=0):
+    ax.text(x, y, text, ha=ha, va=va, fontsize=fs, color=color, rotation=rotation, zorder=6,
+            bbox=dict(fc="white", ec="none", pad=0.6, alpha=0.85))
+
+
+def _arch_dims(cfg: Config | None = None) -> dict[str, object]:
+    """Shapes and hyper-parameters shown in the figure.
+
+    Tensor widths come from the implementation (``models.py`` / ``preprocess.py``)
+    and everything tunable is read from ``cfg``; without one the repository
+    configuration is loaded, so the figure never states dimensions that the run
+    it accompanies did not use.
+    """
+    from .models import ACTION_WEIGHTS, N_FLAGS, N_GENRES
+
+    cfg = cfg or load_config()
+    d = int(cfg.hidden_dim)
+    return {"d": d, "g": N_GENRES, "f": N_FLAGS, "rel_in": 4 * d + 2 * N_GENRES + N_FLAGS + 1,
+            "act_in": 2 * d + 2 * N_GENRES + N_FLAGS + 1 + len(RELATIONSHIPS) + 5,
+            "ltp_in": 3 * d, "sti_in": 5 * d,
+            "max_history": int(cfg.max_history), "max_turns": int(cfg.max_context_turns),
+            "cur_items": 10, "persistence_k": int(cfg.persistence_k),
+            "top_k": ", ".join(str(k) for k in cfg.top_k),
+            "lambda_rel": f"{float(cfg.lambda_rel):g}", "lambda_act": f"{float(cfg.lambda_act):g}",
+            "action_weights": ", ".join(f"({w[0]:.2f}, {w[1]:.2f})".replace("0.", ".")
+                                        for w in ACTION_WEIGHTS.tolist())}
+
+
+def _architecture_wide(cfg: Config | None = None):
+    """Two-column (``figure*``) variant: 7.16 in x 4.70 in, aspect ratio 1.52 : 1."""
+    D = _arch_dims(cfg)
+    d, g, f = D["d"], D["g"], D["f"]
+    fig, ax = _arch_canvas(716, 470)
+    fs = (5.4, 4.7, 4.2)
+    dash_score = (0, (2.2, 1.4))
+    dash_share = (0, (2.0, 1.6))
+    dot_feedback = (0, (1.2, 1.4))
+
+    _arch_panel(ax, (6, 74, 154, 374), "inputs", 1, "Inputs (one instance)")
+    _arch_panel(ax, (168, 74, 132, 374), "encoders", 2, "Encoders")
+    _arch_panel(ax, (324, 74, 260, 374), "arbitration", 3, "Arbitration")
+    _arch_panel(ax, (596, 74, 114, 374), "output", 4, "Output")
+    _arch_panel(ax, (6, 6, 704, 54), "training", 5, "Training objective")
+
+    for rect, label in [((9, 302, 6, 128), "LTP (earlier sessions)"), ((9, 80, 6, 198), "STI (current dialogue)")]:
+        bx, by, bw, bh = rect
+        ax.add_patch(FancyBboxPatch((bx, by), bw, bh, boxstyle="round,pad=0,rounding_size=2",
+                                    fc=ARCH_STYLE["inputs"]["edge"], ec="none", zorder=2))
+        ax.text(bx + bw / 2, by + bh / 2, label, rotation=90, ha="center", va="center",
+                fontsize=4.0, color="white", zorder=3)
+
+    _arch_box(ax, (18, 390, 138, 40), "inputs", "Cross-session liked-item history",
+              "positional embedding, attention pooling",
+              f"ids [B, {D['max_history']}] -> h_hist [B, {d}]", fs)
+    _arch_box(ax, (18, 348, 138, 38), "inputs", "Seeker profile text",
+              "preference statements from\nearlier sessions", "x_prof [B, d_t]", fs)
+    _arch_box(ax, (18, 302, 138, 42), "inputs", "LTP genre prior",
+              "genres of past liked items,\nrecency-decayed (gamma^delta)", f"g_LTP [B, {g}]", fs)
+    _arch_box(ax, (18, 244, 138, 34), "inputs", "Dialogue context",
+              f"up to {D['max_turns']} recent seeker turns", "x_ctx [B, d_t]", fs)
+    _arch_box(ax, (18, 206, 138, 34), "inputs", "Last seeker utterance", "", "x_last [B, d_t]", fs)
+    _arch_box(ax, (18, 168, 138, 34), "inputs", "In-dialogue liked items",
+              "masked mean of item embeddings", f"ids [B, {D['cur_items']}]", fs)
+    _arch_box(ax, (18, 130, 138, 34), "inputs", "STI genre cues",
+              "genres named in this dialogue", f"g_STI [B, {g}]", fs)
+    _arch_box(ax, (18, 80, 138, 46), "inputs", "Lexical flags",
+              "override_sti, override_ltp, negation,\nrequest, cold_user, turn / item\ncounts, history length",
+              f"phi_flag [B, {f}]", fs)
+
+    _arch_box(ax, (174, 366, 122, 64), "encoders", "LTPEncoder",
+              f"concat(h_hist, W x_prof, W g_LTP)\n-> MLP({D['ltp_in']} -> {d} -> {d});\nzeroed without past evidence",
+              f"h_LTP [B, {d}]", fs)
+    _arch_box(ax, (174, 324, 122, 34), "encoders", "LTP item scores",
+              "s_LTP = h_LTP E^T + b", "[B, N+1]", fs)
+    _arch_box(ax, (174, 224, 122, 84), "encoders", "Shared ItemTower",
+              "E = E_id + W_c [title ; genres],\nitem bias b; used for the\nhistory and in-dialogue id\nlookups and for both scorings",
+              f"E [N+1, {d}],  b [N+1]", fs)
+    _arch_box(ax, (174, 126, 122, 64), "encoders", "STIEncoder",
+              f"concat(W x_ctx, W x_last, W g_STI,\nW phi_flag, mean item emb.)\n-> MLP({D['sti_in']} -> {d} -> {d})",
+              f"h_STI [B, {d}]", fs)
+    _arch_box(ax, (174, 84, 122, 34), "encoders", "STI item scores",
+              "s_STI = h_STI E^T + b", "[B, N+1]", fs)
+
+    _arch_box(ax, (338, 366, 236, 64), "arbitration", "3a  RelationshipClassifier",
+              "[h_LTP ; h_STI ; h_LTP * h_STI ; |h_LTP - h_STI| ;\n"
+              f"g_LTP ; g_STI ; phi_flag ; cos]  ->  MLP({D['rel_in']} -> {d} -> {len(RELATIONSHIPS)})\n"
+              + "  |  ".join(RELATIONSHIPS),
+              f"p_rel [B, {len(RELATIONSHIPS)}];  confidence-weighted CE against weak-rule /\nsynthetic labels (weak rules are not human annotations)", fs)
+    _arch_box(ax, (338, 268, 236, 76), "arbitration", "3b  CounterfactualDiagnostic",
+              "interventions on the naive-fusion scores (s_LTP + s_STI) / 2:\n"
+              "drop LTP -> s_STI,   drop STI -> s_LTP\n"
+              "d_LTP, d_STI = 1 - Jaccard of the top-K lists; top-1 margins\n"
+              "driver label: LTP- / STI- / Jointly- / Neither-driven",
+              "phi_cf [B, 5]  (model-based diagnostic, not a causal effect)", fs)
+    _arch_box(ax, (338, 168, 236, 78), "arbitration", "3c  ArbitrationPolicy",
+              f"learned MLP({D['act_in']} -> {d} -> {len(ACTIONS)}) over\n"
+              "[h_LTP ; h_STI ; g_LTP ; g_STI ; phi_flag ; cos ; p_rel ; phi_cf],\n"
+              "or the rule policy (argmax p_rel + evidence overrides)\n"
+              + "  |  ".join(ACTIONS),
+              f"a [B, {len(ACTIONS)}]", fs)
+    _arch_box(ax, (338, 100, 236, 52), "arbitration", "3d  Action-weighted mixing",
+              f"(w_LTP, w_STI) = softmax(a) A,\nA = [{D['action_weights']}]",
+              "w [B, 2];   s = w_LTP s_LTP + w_STI s_STI  [B, N+1]", fs)
+
+    _arch_box(ax, (602, 344, 104, 86), "output", "Top-K recommendation",
+              f"ranked catalogue items\n(K = {D['top_k']}; padding\ncolumn masked to -inf)", "top-K(s)", fs)
+    _arch_box(ax, (602, 232, 104, 96), "output", "Clarification question",
+              "English template that\ncontrasts the dominant\nLTP and STI genres;\nemitted when the action\nis Ask_Clarification", "", fs)
+    _arch_box(ax, (602, 96, 104, 120), "output", "PersistenceTracker",
+              "counts Prioritize_STI on\nthe same genre across\ndistinct sessions of one\n"
+              f"seeker; >= k = {D['persistence_k']} sessions\nis a persistent shift,\n"
+              "otherwise the override\nstays temporary", "", fs)
+
+    for y0, y1 in [(410, 408), (367, 394), (323, 380)]:
+        _arch_arrow(ax, [(156, y0), (172, y1)], LTP_COLOR, rad=0.08)
+    for y0, y1 in [(261, 180), (223, 170), (185, 160), (147, 150), (103, 140)]:
+        _arch_arrow(ax, [(156, y0), (172, y1)], STI_COLOR, rad=0.08)
+    _arch_arrow(ax, [(235, 366), (235, 358)], LTP_COLOR)
+    _arch_arrow(ax, [(235, 126), (235, 118)], STI_COLOR)
+    _arch_arrow(ax, [(212, 308), (212, 324)], FLOW_COLOR, ls=dash_share, lw=0.6)
+    _arch_arrow(ax, [(212, 224), (212, 118)], FLOW_COLOR, ls=dash_share, lw=0.6)
+
+    # signal buses between the encoders and the arbitration stage
+    for pts, color, ls in [
+        ([(296, 398), (303, 398), (303, 412), (338, 412)], LTP_COLOR, "-"),
+        ([(303, 398), (303, 200), (338, 200)], LTP_COLOR, "-"),
+        ([(296, 341), (308, 341), (308, 306), (338, 306)], LTP_COLOR, dash_score),
+        ([(308, 341), (308, 118), (338, 118)], LTP_COLOR, dash_score),
+        ([(296, 158), (313, 158), (313, 382), (338, 382)], STI_COLOR, "-"),
+        ([(313, 158), (313, 182), (338, 182)], STI_COLOR, "-"),
+        ([(296, 101), (318, 101), (318, 286), (338, 286)], STI_COLOR, dash_score),
+        ([(318, 101), (318, 110), (338, 110)], STI_COLOR, dash_score),
+    ]:
+        _arch_arrow(ax, pts, color, ls=ls, lw=0.65)
+    for x, y, c in [(303, 398, LTP_COLOR), (308, 341, LTP_COLOR), (313, 158, STI_COLOR), (318, 101, STI_COLOR)]:
+        ax.add_patch(plt.Circle((x, y), 1.6, fc=c, ec="none", zorder=6))
+
+    _arch_arrow(ax, [(574, 382), (579, 382), (579, 214), (574, 214)], FLOW_COLOR, lw=0.65)
+    _arch_label(ax, 579, 300, "p_rel", 4.0, rotation=90)
+    _arch_arrow(ax, [(456, 268), (456, 246)], FLOW_COLOR)
+    _arch_label(ax, 470, 257, "phi_cf", 4.0)
+    _arch_arrow(ax, [(456, 168), (456, 152)], FLOW_COLOR)
+    _arch_label(ax, 466, 160, "a", 4.0)
+    _arch_arrow(ax, [(574, 126), (590, 126), (590, 388), (602, 388)], FLOW_COLOR, lw=0.8)
+    _arch_label(ax, 590, 300, "s", 4.0)
+    _arch_arrow(ax, [(574, 196), (602, 268)], FLOW_COLOR, ls=dash_score, lw=0.6, rad=-0.12)
+    _arch_arrow(ax, [(574, 176), (602, 178)], FLOW_COLOR, ls=dash_score, lw=0.6)
+    _arch_arrow(ax, [(654, 96), (654, 67), (164, 67), (164, 326), (156, 326)], PERSIST_COLOR,
+                ls=dot_feedback, lw=0.7)
+    _arch_label(ax, 400, 68, "persistent shift: the repeatedly prioritised genre is folded into the LTP prior (+gain)",
+                4.0, PERSIST_COLOR)
+
+    ax.text(6, 460, "AIPA-CRS: adaptive intent-preference arbitration (this implementation)",
+            ha="left", va="center", fontsize=7.4, fontweight="bold", color="#1a1a1a")
+    ax.text(710, 460, f"B: batch  |  N: catalogue items  |  d = {d}  |  d_t: text-embedding dimension",
+            ha="right", va="center", fontsize=4.6, color="#3a3a3a")
+    ax.text(210, 51, "L = L_rec + lambda_rel L_rel + lambda_act L_act      "
+                     f"(lambda_rel = {D['lambda_rel']}, lambda_act = {D['lambda_act']})",
+            ha="left", va="center", fontsize=5.4, fontweight="bold", color=ARCH_STYLE["training"]["text"])
+    ax.text(16, 28,
+            "L_rec: cross-entropy of the fused scores s against the held-out target item (stage 3d).       "
+            "L_rel: confidence-weighted cross-entropy on stage 3a against the weak-rule /\n"
+            "controlled-synthetic relationship labels.       "
+            "L_act: confidence-weighted cross-entropy on stage 3c against the rule-derived action (learned policy only).",
+            ha="left", va="center", fontsize=4.6, color="#1c1c1c", linespacing=1.4)
+    ax.text(704, 12,
+            "solid: hidden-state flow      dashed: item-score / diagnostic flow      dotted: cross-session feedback",
+            ha="right", va="center", fontsize=4.2, color="#3a3a3a")
     return fig
+
+
+def _architecture_compact(cfg: Config | None = None):
+    """Single-column variant: 3.50 in x 5.16 in, aspect ratio 1 : 1.47."""
+    D = _arch_dims(cfg)
+    d, g, f = D["d"], D["g"], D["f"]
+    fig, ax = _arch_canvas(350, 516)
+    fs = (5.0, 4.5, 4.1)
+    dash_score = (0, (2.2, 1.4))
+    dash_share = (0, (2.0, 1.6))
+
+    _arch_panel(ax, (4, 404, 334, 92), "inputs", 1, "Inputs", fs=5.2)
+    _arch_panel(ax, (4, 308, 334, 88), "encoders", 2, "Encoders", fs=5.2)
+    _arch_panel(ax, (4, 122, 334, 178), "arbitration", 3, "Arbitration", fs=5.2)
+    _arch_panel(ax, (4, 48, 334, 66), "output", 4, "Output", fs=5.2)
+    _arch_panel(ax, (4, 6, 334, 34), "training", 5, "Training", fs=5.2)
+
+    _arch_box(ax, (10, 410, 158, 72), "inputs", "Cross-session (LTP)",
+              "liked-item history with positional\nembedding and attention pooling;\nprofile text; recency-decayed\ngenre prior",
+              f"ids [B,{D['max_history']}], x_prof [B,d_t], g_LTP [B,{g}]", fs)
+    _arch_box(ax, (172, 410, 158, 72), "inputs", "Current dialogue (STI)",
+              "context and last seeker utterance;\nin-dialogue liked items (masked\nmean); genre cues; lexical flags\n(override, negation, request, cold_user)",
+              f"x_ctx, x_last [B,d_t], g_STI [B,{g}], phi_flag [B,{f}]", fs)
+
+    _arch_box(ax, (10, 314, 104, 66), "encoders", "LTPEncoder",
+              f"MLP({D['ltp_in']} -> {d} -> {d})", f"h_LTP [B,{d}]\ns_LTP = h_LTP E^T + b", fs)
+    _arch_box(ax, (120, 314, 108, 66), "encoders", "Shared ItemTower",
+              "E = E_id + W_c [title ; genres]\nwith item bias b; supplies the\nid lookups and both score\nvectors", f"E [N+1,{d}]", fs)
+    _arch_box(ax, (234, 314, 96, 66), "encoders", "STIEncoder",
+              f"MLP({D['sti_in']} -> {d} -> {d})", f"h_STI [B,{d}]\ns_STI = h_STI E^T + b", fs)
+
+    _arch_box(ax, (10, 218, 158, 62), "arbitration", "3a  RelationshipClassifier",
+              "[h_LTP ; h_STI ; h_LTP * h_STI ;\n|h_LTP - h_STI| ; g_LTP ; g_STI ;\nphi_flag ; cos] -> 5 classes\n"
+              "Complement | Consistent | Conflict\n| Override | Uncertain", "p_rel [B,5]", fs)
+    _arch_box(ax, (172, 218, 158, 62), "arbitration", "3b  CounterfactualDiagnostic",
+              "drop LTP / drop STI on the\nnaive-fusion scores; d_LTP, d_STI\n= 1 - top-K Jaccard, plus margins\n-> LTP- / STI- / Jointly- /\nNeither-driven", "phi_cf [B,5]", fs)
+    _arch_box(ax, (10, 166, 320, 46), "arbitration", "3c  ArbitrationPolicy (learned MLP or rule policy)",
+              "Fuse  |  Prioritize_LTP  |  Prioritize_STI  |  Ask_Clarification", "a [B,4]", fs)
+    _arch_box(ax, (10, 128, 320, 32), "arbitration", "3d  Action-weighted mixing",
+              "(w_LTP, w_STI) = softmax(a) A;   s = w_LTP s_LTP + w_STI s_STI", "", fs)
+
+    _arch_box(ax, (10, 54, 158, 42), "output", f"Top-K list (K = {D['top_k']})",
+              "plus the template clarification\nquestion when the action is\nAsk_Clarification", "", fs)
+    _arch_box(ax, (172, 54, 158, 42), "output", "PersistenceTracker",
+              f"Prioritize_STI on the same genre in\n>= k = {D['persistence_k']} sessions is folded into the\n"
+              "LTP genre prior (persistent shift)", "", fs)
+
+    ax.text(58, 22, "L = L_rec + lambda_rel L_rel + lambda_act L_act   "
+                    f"({D['lambda_rel']} / {D['lambda_act']}): item cross-entropy, plus confidence-weighted\n"
+                    "cross-entropy on the relationship (weak-rule / synthetic labels) and on the rule-derived action",
+            ha="left", va="center", fontsize=4.4, color="#1c1c1c", linespacing=1.4)
+
+    _arch_arrow(ax, [(100, 410), (100, 380)], LTP_COLOR, rad=0.05)
+    _arch_arrow(ax, [(282, 410), (282, 380)], STI_COLOR, rad=0.05)
+    _arch_arrow(ax, [(120, 347), (114, 347)], FLOW_COLOR, ls=dash_share, lw=0.6)
+    _arch_arrow(ax, [(228, 347), (234, 347)], FLOW_COLOR, ls=dash_share, lw=0.6)
+    _arch_arrow(ax, [(100, 314), (100, 280)], LTP_COLOR)
+    _arch_arrow(ax, [(282, 314), (282, 280)], STI_COLOR)
+    _arch_arrow(ax, [(100, 218), (100, 212)], FLOW_COLOR)
+    _arch_arrow(ax, [(251, 218), (251, 212)], FLOW_COLOR)
+    _arch_arrow(ax, [(170, 166), (170, 160)], FLOW_COLOR)
+    _arch_arrow(ax, [(100, 128), (100, 96)], FLOW_COLOR)
+    _arch_arrow(ax, [(251, 128), (251, 96)], FLOW_COLOR, ls=dash_score, lw=0.6)
+    _arch_arrow(ax, [(330, 75), (344, 75), (344, 490), (100, 490), (100, 482)], PERSIST_COLOR,
+                ls=(0, (1.2, 1.4)), lw=0.7)
+    _arch_label(ax, 300, 106, "persistent shift", 4.0, PERSIST_COLOR)
+
+    ax.text(4, 508, "AIPA-CRS architecture (this implementation)", ha="left", va="center",
+            fontsize=6.4, fontweight="bold", color="#1a1a1a")
+    ax.text(346, 508, f"B: batch | N: items | d = {d}", ha="right", va="center", fontsize=4.2,
+            color="#3a3a3a")
+    return fig
+
+
+def architecture_diagram(compact: bool = False, cfg: Config | None = None):
+    """Architecture overview of the implemented model.
+
+    ``compact=False`` returns the wide two-column (``figure*``) version,
+    ``compact=True`` the single-column version.  Dimensions and hyper-parameters
+    are read from ``cfg`` (the repository configuration when it is omitted).  The
+    figure is returned, not saved; use :func:`save_architecture_diagrams` (or
+    :func:`make_all`) to write ``fig00_architecture{,_compact}.{png,pdf}``.
+    """
+    return _architecture_compact(cfg) if compact else _architecture_wide(cfg)
+
+
+def save_architecture_diagrams(out: str | Path = "outputs/figures",
+                               cfg: Config | None = None) -> dict[str, Path]:
+    out = Path(out)
+    return {name: _save(architecture_diagram(compact=c, cfg=cfg), out, name)[0]
+            for name, c in [("fig00_architecture", False), ("fig00_architecture_compact", True)]}
