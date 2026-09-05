@@ -1,12 +1,15 @@
 """Fast unit tests (synthetic mini-corpus; no download required)."""
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 import torch
 
 from aipa import ACTIONS, RELATIONSHIPS
 from aipa.config import load_config
+from aipa.data import GENRES as ALL_GENRES
 from aipa.data import Dialogue, ReDial
 from aipa.evaluate import arbitration_metrics, bootstrap_ci, paired_test, per_sample_ranking, relationship_metrics
 from aipa.labeling import inject_controlled, label_all
@@ -141,6 +144,97 @@ def test_clarification_is_english_and_mentions_genres():
     assert "drama" in q.lower() and "horror" in q.lower() and q.endswith("?")
 
 
+def test_item_text_enriches_title_with_genres(mini):
+    from aipa.preprocess import item_text, item_texts
+
+    assert item_text(mini, 6) == "Movie 6 (1996). Genres: Comedy"
+    assert item_text(mini, 6, with_genres=False) == "Movie 6 (1996)"
+    bare = ReDial(dialogues=mini.dialogues, movie_titles=mini.movie_titles, movie_genres={}, movie_year=mini.movie_year, source="t")
+    assert item_text(bare, 6) == "Movie 6 (1996)"  # no genres known -> plain title
+    c = load_config("quick")
+    c.values.update(item_text_genres=False)
+    assert item_texts(mini, c) == [mini.movie_titles[m] for m in sorted(mini.movie_titles)]
+
+
+def test_tfidf_encoder_zero_for_empty_and_unit_norm(mini, cfg):
+    from aipa.preprocess import TextEncoder
+
+    enc = TextEncoder(cfg).fit(["funny comedy movie", "scary horror film", "war drama"] * 3 + list(mini.movie_titles.values()))
+    assert not enc.is_pretrained and enc.dim == cfg.text_dim
+    Z = enc.encode(["a funny comedy", "", "   "])
+    assert Z.shape == (3, cfg.text_dim) and np.allclose(Z[1:], 0) and np.isclose(np.linalg.norm(Z[0]), 1.0, atol=1e-4)
+    assert enc.encode([]).shape == (0, cfg.text_dim)
+    assert enc.summary()["name"] == "tfidf-svd" and enc.summary()["fallback_reason"] is None
+
+
+def test_unavailable_pretrained_model_falls_back_or_raises(cfg):
+    from aipa.preprocess import TextEncoder
+
+    c = load_config("quick")
+    c.values.update(cfg.values, embedding_model="sentence-transformers/this-model-does-not-exist-aipa", embedding_fallback=True)
+    enc = TextEncoder(c)
+    assert enc.name == "tfidf-svd" and enc.requested == c.embedding_model and enc.fallback_reason
+    c.values["embedding_fallback"] = False
+    with pytest.raises(RuntimeError, match="unavailable"):
+        TextEncoder(c)
+
+
+def test_embedding_cache_roundtrip(tmp_path):
+    from aipa.preprocess import EmbeddingCache
+
+    p = tmp_path / "text_cache_x.npz"
+    c = EmbeddingCache(p, 4)
+    c.put("k1", np.arange(4, dtype=np.float32))
+    c.save()
+    assert p.exists() and not c.dirty
+    c2 = EmbeddingCache(p, 4)
+    assert len(c2) == 1 and np.array_equal(c2.get("k1"), np.arange(4, dtype=np.float32)) and c2.get("k2") is None
+    assert len(EmbeddingCache(p, 8)) == 0  # dimension mismatch -> ignored, not mixed
+
+
+@pytest.fixture(scope="module")
+def minilm_cfg(cfg, tmp_path_factory):
+    pytest.importorskip("sentence_transformers")
+    c = load_config("quick")
+    c.values.update(cfg.values, embedding_model="sentence-transformers/all-MiniLM-L6-v2", embedding_fallback=False,
+                    interim_path=str(tmp_path_factory.mktemp("interim")))
+    try:
+        from aipa.preprocess import TextEncoder
+
+        TextEncoder(c)
+    except Exception as exc:  # weights not downloadable offline
+        pytest.skip(f"MiniLM unavailable: {exc}")
+    return c
+
+
+def test_minilm_encoder_dim_cache_and_model_shapes(mini, minilm_cfg):
+    from aipa.preprocess import TextEncoder, build_item_index
+
+    c = minilm_cfg
+    enc = TextEncoder(c).fit([])
+    assert enc.is_pretrained and enc.dim == 384
+    Z = enc.encode(["a funny comedy", "", "a funny comedy", "a scary horror film"])
+    assert Z.shape == (4, 384) and np.allclose(Z[1], 0) and np.array_equal(Z[0], Z[2])
+    assert np.isclose(np.linalg.norm(Z[0]), 1.0, atol=1e-4)
+    assert enc.n_encoded == 2 and enc.n_cache_hits == 0  # duplicates inside one call are encoded once
+    # semantic neighbour: comedy query closer to comedy paraphrase than to horror
+    Q = enc.encode(["something hilarious to laugh at"])
+    assert Q @ Z[0] > Q @ Z[3]
+    # second encoder instance reads the on-disk cache and re-encodes nothing
+    enc2 = TextEncoder(c)
+    Z2 = enc2.encode(["a funny comedy", "a scary horror film"])
+    assert enc2.n_encoded == 0 and enc2.n_cache_hits == 2 and np.array_equal(Z2[0], Z[0])
+    assert enc2.summary()["cache_path"].endswith("text_cache_sentence-transformers_all-MiniLM-L6-v2_" + hashlib.sha1(c.embedding_model.encode()).hexdigest()[:8] + ".npz")
+    inst = build_instances(mini, c)
+    index = build_item_index(mini, enc, c)
+    assert index.content.shape[1] == 384 + len(ALL_GENRES)
+    X = tensorise(inst["train"], enc, index, c)
+    assert X["profile"].shape[1] == X["context"].shape[1] == 384
+    for name in ["Conversation-aware", "AIPA (full)"]:
+        model = build_model(name, index.content, c)
+        assert model(X)["scores"].shape == (X["target"].shape[0], index.n)
+
+
 def test_models_forward_shapes(mini, cfg):
     from aipa.preprocess import TextEncoder, build_item_index
 
@@ -256,3 +350,21 @@ def test_persistence_override_is_chronological_and_marks_affected(mini, cfg):
     assert torch.allclose(override[~torch.tensor(affected)], X["ltp_genres"][~torch.tensor(affected)])
     _, shifts_k5, affected_k5 = _persistence_override(None, test, X, pred, cfg, k=5)
     assert not shifts_k5 and not affected_k5.any()
+
+
+def test_architecture_figure_reports_the_active_config(cfg):
+    import matplotlib.pyplot as plt
+
+    from aipa.figures import architecture_diagram
+
+    cfg.values.update(hidden_dim=16, max_history=7, max_context_turns=3, persistence_k=4,
+                      top_k=[5], lambda_rel=0.25, lambda_act=0.75)
+    for compact in (False, True):
+        fig = architecture_diagram(compact=compact, cfg=cfg)
+        text = " ".join(t.get_text() for t in fig.axes[0].texts)
+        plt.close(fig)
+        assert "d = 16" in text
+        assert f"MLP({3 * 16} -> 16 -> 16)" in text and f"MLP({5 * 16} -> 16 -> 16)" in text
+        assert "[B, 7]" in text or "[B,7]" in text
+        assert "k = 4" in text and "K = 5" in text
+        assert "0.25" in text and "0.75" in text

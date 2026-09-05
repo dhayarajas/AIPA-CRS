@@ -41,6 +41,7 @@ from .preprocess import (
     build_instances,
     build_item_index,
     instances_frame,
+    item_texts,
     load_instances,
     save_instances,
     tensorise,
@@ -81,9 +82,9 @@ def prepare(cfg: Config, verbose: bool = True):
         save_instances(inst, cfg, name)
     enc = TextEncoder(cfg).fit(
         [x.seeker_recent_text for x in inst["train"]] + [" ".join(x.profile_sentences) for x in inst["train"]]
-        + list(ds.movie_titles.values())
+        + item_texts(ds, cfg)
     )
-    index = build_item_index(ds, enc)
+    index = build_item_index(ds, enc, cfg)
     syn_train = inject_controlled(inst["train"], ds, cfg, inst["train"], cfg.seed)
     syn_test = inject_controlled(inst["test"], ds, cfg, inst["train"], cfg.seed + 1)
     human = load_human_verified(cfg)
@@ -100,6 +101,10 @@ def prepare(cfg: Config, verbose: bool = True):
         "valid": tensorise(inst["valid"], enc, index, cfg),
         "test": tensorise(test_all, enc, index, cfg),
     }
+    if verbose:
+        s = enc.summary()
+        print(f"text encoder: {s['name']} (dim={s['dim']}) encoded {s['n_newly_encoded']} new strings, "
+              f"{s['n_cache_hits']} cache hits, {s['encode_seconds']}s")
     return ds, enc, index, {"train": train_all, "valid": inst["valid"], "test": test_all}, {
         "train": lab_train, "valid": lab_valid, "test": lab_test}, tensors, human
 
@@ -262,6 +267,7 @@ def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None 
     res.extra["test_instances"] = test_inst
     res.extra["test_tensors"] = X["test"]
     res.extra["train_labels"] = labels_frame(inst["train"], labels["train"])
+    res.extra["text_encoder"] = enc.summary()
     res.extra["dataset_source"] = ds.source
     res.extra["file_hashes"] = ds.file_hashes
     res.extra["n_train"] = len(inst["train"])
@@ -772,7 +778,8 @@ def save_results(res: Results) -> None:
         sw.to_csv(out / "persistence_sweep_raw.csv", index=False)
     meta = {
         "run_mode": res.cfg.run_mode, "config": res.cfg.to_dict(), "environment": environment_report(),
-        "status": res.status, "dataset_source": res.extra.get("dataset_source"), "file_hashes": res.extra.get("file_hashes"),
+        "status": res.status, "text_encoder": res.extra.get("text_encoder"),
+        "dataset_source": res.extra.get("dataset_source"), "file_hashes": res.extra.get("file_hashes"),
         "n_train": res.extra.get("n_train"), "n_valid": res.extra.get("n_valid"), "n_test": int(len(res.labels)),
         "runtime_s": res.extra.get("runtime_s"), "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
     }

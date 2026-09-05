@@ -18,9 +18,12 @@ Nothing after *t* - in the same dialogue or in later dialogues - is used.
 """
 from __future__ import annotations
 
+import hashlib
 import pickle
 import re
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -300,24 +303,104 @@ def _make_instance(d, ds, cfg, t, target, hist_items, prefs, n_sessions, ltp_gen
 # text encoder
 # --------------------------------------------------------------------------
 
+TFIDF = "tfidf-svd"
+
+
+def _sha1(text: str) -> str:
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+
+class EmbeddingCache:
+    """On-disk store of sentence embeddings keyed by the SHA-1 of the text
+    (``<interim>/text_cache_<model>_<id-hash>.npz``) so repeated runs and seeds never
+    re-encode the same string."""
+
+    def __init__(self, path: Path | None, dim: int):
+        self.path, self.dim = path, dim
+        self.store: dict[str, np.ndarray] = {}
+        self.dirty = False
+        if path is not None and path.exists():
+            with np.load(path) as z:
+                keys, emb = z["keys"], z["emb"]
+            if emb.ndim == 2 and emb.shape[1] == dim:
+                self.store = dict(zip(keys.tolist(), emb.astype(np.float32)))
+
+    def __len__(self) -> int:
+        return len(self.store)
+
+    def get(self, key: str) -> np.ndarray | None:
+        return self.store.get(key)
+
+    def put(self, key: str, vec: np.ndarray) -> None:
+        self.store[key] = vec.astype(np.float32)
+        self.dirty = True
+
+    def save(self) -> None:
+        if self.path is None or not self.dirty:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        keys = np.array(list(self.store), dtype=str)
+        emb = np.stack(list(self.store.values())) if self.store else np.zeros((0, self.dim), np.float32)
+        tmp = self.path.with_name(self.path.name + ".tmp.npz")
+        np.savez(tmp, keys=keys, emb=emb)
+        tmp.replace(self.path)
+        self.dirty = False
+
+
 class TextEncoder:
-    """Lightweight TF-IDF + SVD encoder (default) or a sentence-transformers model."""
+    """Text -> fixed-size vector.  ``cfg.embedding_model`` selects the back-end:
+
+    * ``"tfidf-svd"``: word n-gram TF-IDF + truncated SVD (``cfg.text_dim``) fitted on
+      the training texts; runs in seconds on CPU.
+    * a sentence-transformers model id (e.g. ``sentence-transformers/all-MiniLM-L6-v2``):
+      pretrained encoder whose own dimension (384 for MiniLM) becomes ``self.dim``;
+      embeddings are L2-normalised, encoded in batches of ``cfg.encoder_batch_size`` and
+      cached on disk (:class:`EmbeddingCache`) when ``cfg.text_cache`` is true.
+
+    Empty strings encode to the zero vector under both back-ends so that downstream
+    presence checks (``x.abs().sum() > 0``) are encoder-independent.  If the pretrained
+    model cannot be loaded and ``cfg.embedding_fallback`` is true the encoder falls back
+    to TF-IDF + SVD and records why in ``self.fallback_reason``; otherwise the error is raised.
+    """
 
     def __init__(self, cfg: Config):
+        self.requested = cfg.embedding_model
         self.name = cfg.embedding_model
-        self.dim = cfg.text_dim
+        self.dim = int(cfg.text_dim)
+        self.batch_size = int(cfg.values.get("encoder_batch_size", 128))
+        self.fallback_reason: str | None = None
+        self.encode_seconds = 0.0
+        self.n_encoded = 0
+        self.n_cache_hits = 0
         self._st = None
-        if self.name != "tfidf-svd":
+        self._cache: EmbeddingCache | None = None
+        if self.name != TFIDF:
             try:
                 from sentence_transformers import SentenceTransformer
 
                 self._st = SentenceTransformer(self.name, device=cfg.device)
-                self.dim = self._st.get_sentence_embedding_dimension()
+                self.dim = int(self._st.get_embedding_dimension())
             except Exception as exc:
-                print(f"sentence-transformers model {self.name!r} unavailable ({exc!r}); falling back to tfidf-svd")
-                self.name = "tfidf-svd"
-        self.vec = TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True, max_features=50000)
-        self.svd = TruncatedSVD(n_components=self.dim, random_state=cfg.seed)
+                reason = f"{self.name!r} unavailable ({exc.__class__.__name__}: {exc})"
+                if not cfg.values.get("embedding_fallback", True):
+                    raise RuntimeError(f"sentence-transformers model {reason}; set embedding_fallback: true to use {TFIDF}") from exc
+                self.fallback_reason = reason
+                print(f"sentence-transformers model {self.fallback_reason}; falling back to {TFIDF}")
+                self.name = TFIDF
+                self._st = None
+        if self._st is not None:
+            cache_path = None
+            if cfg.values.get("text_cache", True):
+                slug = re.sub(r"[^A-Za-z0-9._-]+", "_", self.name)
+                cache_path = cfg.path("interim_path") / f"text_cache_{slug}_{_sha1(self.name)[:8]}.npz"
+            self._cache = EmbeddingCache(cache_path, self.dim)
+        else:
+            self.vec = TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True, max_features=50000)
+            self.svd = TruncatedSVD(n_components=self.dim, random_state=cfg.seed)
+
+    @property
+    def is_pretrained(self) -> bool:
+        return self._st is not None
 
     def fit(self, texts: list[str]) -> TextEncoder:
         if self._st is None:
@@ -328,13 +411,56 @@ class TextEncoder:
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
-        if self._st is not None:
-            return self._st.encode(texts, batch_size=64, show_progress_bar=False).astype(np.float32)
+        t0 = time.perf_counter()
+        Z = self._encode_pretrained(texts) if self._st is not None else self._encode_tfidf(texts)
+        self.encode_seconds += time.perf_counter() - t0
+        return Z
+
+    def _encode_tfidf(self, texts: list[str]) -> np.ndarray:
         empty = np.array([not t.strip() for t in texts])
         Z = self.svd.transform(self.vec.transform(texts)).astype(np.float32)
         Z[empty] = 0.0
         norm = np.linalg.norm(Z, axis=1, keepdims=True) + 1e-8
         return Z / norm
+
+    def _encode_pretrained(self, texts: list[str]) -> np.ndarray:
+        assert self._st is not None and self._cache is not None
+        clean = [t.strip() for t in texts]
+        keys = [_sha1(t) for t in clean]
+        todo: dict[str, str] = {}
+        for t, k in zip(clean, keys):
+            if t and self._cache.get(k) is None:
+                todo.setdefault(k, t)
+            elif t:
+                self.n_cache_hits += 1
+        if todo:
+            uniq = list(todo)
+            emb = self._st.encode([todo[k] for k in uniq], batch_size=self.batch_size, show_progress_bar=False,
+                                  convert_to_numpy=True, normalize_embeddings=True)
+            for k, v in zip(uniq, np.asarray(emb, dtype=np.float32)):
+                self._cache.put(k, v)
+            self.n_encoded += len(uniq)
+            self._cache.save()
+        Z = np.zeros((len(texts), self.dim), dtype=np.float32)
+        for i, (t, k) in enumerate(zip(clean, keys)):
+            if t:
+                Z[i] = self._cache.get(k)
+        return Z
+
+    def summary(self) -> dict:
+        return {
+            "requested": self.requested,
+            "name": self.name,
+            "dim": self.dim,
+            "pretrained": self.is_pretrained,
+            "fallback_reason": self.fallback_reason,
+            "batch_size": self.batch_size if self.is_pretrained else None,
+            "encode_seconds": round(self.encode_seconds, 2),
+            "n_newly_encoded": self.n_encoded,
+            "n_cache_hits": self.n_cache_hits,
+            "cache_size": len(self._cache) if self._cache is not None else None,
+            "cache_path": str(self._cache.path) if self._cache is not None and self._cache.path else None,
+        }
 
 
 # --------------------------------------------------------------------------
@@ -352,10 +478,27 @@ class ItemIndex:
         return len(self.ids)
 
 
-def build_item_index(ds: ReDial, encoder: TextEncoder) -> ItemIndex:
+def item_text(ds: ReDial, mid: int, with_genres: bool = True) -> str:
+    """Content string of an item: the ReDial title (which already carries the year),
+    optionally enriched with its MovieLens genres, e.g.
+    ``"Toy Story (1995). Genres: Animation, Comedy"``."""
+    title = ds.movie_titles[mid].strip()
+    genres = ds.movie_genres.get(mid) or []
+    if with_genres and genres:
+        return f"{title}. Genres: {', '.join(genres)}"
+    return title
+
+
+def item_texts(ds: ReDial, cfg: Config) -> list[str]:
+    with_genres = bool(cfg.values.get("item_text_genres", True))
+    return [item_text(ds, mid, with_genres) for mid in sorted(ds.movie_titles)]
+
+
+def build_item_index(ds: ReDial, encoder: TextEncoder, cfg: Config | None = None) -> ItemIndex:
     ids = [0] + sorted(ds.movie_titles)
     id2pos = {mid: i for i, mid in enumerate(ids)}
-    titles = ["" if i == 0 else ds.movie_titles[i] for i in ids]
+    with_genres = bool(cfg.values.get("item_text_genres", True)) if cfg is not None else True
+    titles = ["" if i == 0 else item_text(ds, i, with_genres) for i in ids]
     T = encoder.encode(titles)
     G = np.zeros((len(ids), len(GENRES)), dtype=np.float32)
     for pos, mid in enumerate(ids):

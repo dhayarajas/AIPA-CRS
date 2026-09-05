@@ -10,11 +10,20 @@ common:
   interim_path: data/interim
   external_path: data/external
   output_path: outputs
-  # "tfidf-svd" is a lightweight word n-gram TF-IDF + SVD encoder that runs on CPU
-  # in seconds.  Any sentence-transformers model id (e.g. all-MiniLM-L6-v2) can be
-  # used instead when the weights are available offline.
+  # Text encoder for profile / context / last-utterance strings and item titles.
+  #   "tfidf-svd": word n-gram TF-IDF + SVD (`text_dim` components), fitted on the
+  #                training split; CPU, seconds, no download.
+  #   any sentence-transformers id, e.g. "sentence-transformers/all-MiniLM-L6-v2"
+  #                (384-d, ~90 MB, fetched from Hugging Face on first use): pretrained
+  #                semantic embeddings; `text_dim` is then ignored and the model's own
+  #                dimension is projected to `hidden_dim` inside the LTP/STI/item towers.
+  # Override from the CLI with `python -m aipa.pipeline --embedding-model <id>`.
   embedding_model: tfidf-svd
   text_dim: 128
+  encoder_batch_size: 128       # sentence-transformers batch size (CPU)
+  text_cache: true              # cache embeddings in data/interim/text_cache_<model>_<id-hash>.npz (keyed by sha1 of the text)
+  embedding_fallback: true      # fall back to tfidf-svd (and record why) if the pretrained model cannot be loaded
+  item_text_genres: true        # item text = "Title (year). Genres: Comedy, Romance" (false: bare ReDial title)
   hidden_dim: 64
   learning_rate: 0.003
   weight_decay: 0.00001
@@ -73,6 +82,9 @@ quick:
   epochs: 15
   hidden_dim: 64
   text_dim: 64
+  # quick mode keeps the download-free encoder; switch to the pretrained one with
+  #   embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  embedding_model: tfidf-svd
   seeds: [42, 7]
   bootstrap_samples: 200
   batch_size: 128
@@ -81,7 +93,8 @@ full:
   subset_fraction: 1.0
   epochs: 20
   hidden_dim: 64
-  text_dim: 128
+  text_dim: 128                 # only used when embedding_model is tfidf-svd
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
   seeds: [42, 7, 123, 2024, 31337]
   bootstrap_samples: 1000
   batch_size: 256

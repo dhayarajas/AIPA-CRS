@@ -82,9 +82,10 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     return pd.DataFrame(checks, columns=["component", "status", "note"])
 
 
-def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bool = True) -> tuple[Results, pd.DataFrame]:
+def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bool = True,
+            overrides: dict | None = None) -> tuple[Results, pd.DataFrame]:
     t0 = time.perf_counter()
-    cfg = load_config(run_mode)
+    cfg = load_config(run_mode, overrides=overrides)
     if clean_outputs:
         shutil.rmtree(cfg.path("output_path"), ignore_errors=True)
     print(dataset_status(cfg).to_string())
@@ -110,6 +111,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-mode", default=None, choices=["quick", "full"])
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--embedding-model", default=None,
+                    help="override configs/default.yaml embedding_model (tfidf-svd or a sentence-transformers id)")
     a = ap.parse_args()
-    _, val = run_all(a.run_mode, verbose=not a.quiet)
+    _, val = run_all(a.run_mode, verbose=not a.quiet, overrides={"embedding_model": a.embedding_model})
     sys.exit(0 if (val.status != "FAIL").all() else 1)

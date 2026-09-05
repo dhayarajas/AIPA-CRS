@@ -1,0 +1,19 @@
+\begin{tabular}{lccccc}
+\toprule
+Model & Hit@10 [95\% CI] & NDCG@10 & MRR@10 & Hit@20 & NDCG@20 \\
+\midrule
+LTP-only & 0.016 [0.000, 0.040] & 0.013 & 0.012 & 0.032 & 0.017 \\
+STI-only & 0.113 [0.056, 0.177] & 0.046 & 0.026 & 0.210 & 0.069 \\
+Naive fusion & 0.065 [0.024, 0.113] & 0.036 & 0.026 & 0.129 & 0.052 \\
+Adaptive fusion & 0.048 [0.016, 0.089] & 0.019 & 0.010 & 0.129 & 0.040 \\
+Sequential (GRU) & 0.032 [0.008, 0.073] & 0.017 & 0.013 & 0.065 & 0.025 \\
+Conversation-aware & 0.073 [0.024, 0.113] & 0.040 & 0.030 & 0.137 & 0.057 \\
+\midrule
+AIPA w/o relationship & 0.113 [0.056, 0.177] & 0.052 & 0.033 & 0.161 & 0.064 \\
+AIPA w/o counterfactual & 0.105 [0.048, 0.161] & 0.052 & 0.036 & 0.161 & 0.066 \\
+AIPA w/o clarification & 0.105 [0.056, 0.161] & 0.053 & 0.038 & 0.153 & 0.065 \\
+AIPA w/o persistence & 0.056 [0.016, 0.105] & 0.033 & 0.026 & 0.153 & 0.058 \\
+AIPA (rule policy) & 0.073 [0.032, 0.129] & 0.040 & 0.029 & 0.137 & 0.056 \\
+\textbf{AIPA (full)} & \textbf{0.056 [0.016, 0.105]} & \textbf{0.033} & \textbf{0.026} & \textbf{0.153} & \textbf{0.058} \\
+\bottomrule
+\end{tabular}
