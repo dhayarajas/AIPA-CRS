@@ -51,13 +51,17 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     checks.append(("human-verified labels", "PASS" if res.status.get("human_verified_labels") == "RUN" else "NOT RUN", res.status.get("human_verified_labels", "")))
     models = set(res.per_sample.model)
     disabled = set(res.cfg.values.get("disabled_models", []))
-    for m in BASELINE_NAMES:
+
+    def add_model(label, m):
         if m in disabled:
-            checks.append((f"baseline: {m}", "NOT RUN", "disabled in config"))
+            checks.append((label, "NOT RUN", "disabled in config"))
         else:
-            add(f"baseline: {m}", m in models, "")
+            add(label, m in models, "")
+
+    for m in BASELINE_NAMES:
+        add_model(f"baseline: {m}", m)
     for m in ["AIPA w/o relationship", "AIPA w/o counterfactual", "AIPA w/o clarification", "AIPA w/o persistence", "AIPA (rule policy)", PRIMARY]:
-        add(f"model: {m}", m in models, "")
+        add_model(f"model: {m}", m)
     add("relationship classifier metrics", len(T.get("relationship", [])) > 0, "")
     add("arbitration & clarification metrics", len(T.get("arbitration", [])) > 0, "")
     add("counterfactual driver diagnostic", len(res.counterfactual) > 0, "")
