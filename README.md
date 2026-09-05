@@ -44,8 +44,12 @@ The first run downloads ReDial (~33 MB zip from `github.com/ReDialData/website`)
 MovieLens `ml-latest` genre file (~350 MB zip, only `movies.csv` is kept) into `data/`.
 If your machine has no internet access, place `redial_dataset.zip` in `data/raw/redial/`
 and `movies.csv` in `data/external/ml-latest/` - the loader validates sizes and SHA-1 hashes
-and reports source/version in the report. Without MovieLens the pipeline still runs; genre
-coverage then drops and is reported as such.
+and reports source/version in the report. MovieLens genres are required: they drive the
+LTP/STI genre signals and the relationship labels, so the pipeline stops with a clear error
+when `movies.csv` is missing rather than silently producing an empty conflict subset. If the
+GroupLens TLS check fails (expired certificate or a wrong system clock) the download is retried
+without verification and a warning is printed. After adding the file by hand, delete
+`data/interim/` and `data/processed/` so cached genre-less features are rebuilt.
 
 ### Text encoder (`embedding_model`)
 
