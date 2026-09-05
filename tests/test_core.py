@@ -158,3 +158,21 @@ def test_models_forward_shapes(mini, cfg):
             assert out["rel_logits"].shape[1] == len(RELATIONSHIPS) and out["act_logits"].shape[1] == len(ACTIONS)
             w = torch.stack([out["w_ltp"], out["w_sti"]], 1)
             assert torch.allclose(w.sum(1), torch.ones(w.shape[0]), atol=1e-4)
+
+
+def test_architecture_figure_reports_the_active_config(cfg):
+    import matplotlib.pyplot as plt
+
+    from aipa.figures import architecture_diagram
+
+    cfg.values.update(hidden_dim=16, max_history=7, max_context_turns=3, persistence_k=4,
+                      top_k=[5], lambda_rel=0.25, lambda_act=0.75)
+    for compact in (False, True):
+        fig = architecture_diagram(compact=compact, cfg=cfg)
+        text = " ".join(t.get_text() for t in fig.axes[0].texts)
+        plt.close(fig)
+        assert "d = 16" in text
+        assert f"MLP({3 * 16} -> 16 -> 16)" in text and f"MLP({5 * 16} -> 16 -> 16)" in text
+        assert "[B, 7]" in text or "[B,7]" in text
+        assert "k = 4" in text and "K = 5" in text
+        assert "0.25" in text and "0.75" in text

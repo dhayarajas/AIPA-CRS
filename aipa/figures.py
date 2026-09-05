@@ -14,6 +14,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 
 from . import ACTIONS, RELATIONSHIPS  # noqa: E402
+from .config import Config, load_config  # noqa: E402
 from .experiments import MODEL_ORDER, PRIMARY, Results  # noqa: E402
 
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.1)
@@ -234,8 +235,9 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         ax[1].set_title("Inference time per test instance (ms)")
         reg("fig13_efficiency", _save(fig, out, "fig13_efficiency"))
     # 14. architecture diagram (two-column wide + single-column compact variant)
-    reg("fig00_architecture", _save(architecture_diagram(), out, "fig00_architecture"))
-    reg("fig00_architecture_compact", _save(architecture_diagram(compact=True), out, "fig00_architecture_compact"))
+    reg("fig00_architecture", _save(architecture_diagram(cfg=res.cfg), out, "fig00_architecture"))
+    reg("fig00_architecture_compact",
+        _save(architecture_diagram(compact=True, cfg=res.cfg), out, "fig00_architecture_compact"))
     return made
 
 
@@ -323,19 +325,32 @@ def _arch_label(ax, x, y, text, fs=4.2, color=FLOW_COLOR, ha="center", va="cente
             bbox=dict(fc="white", ec="none", pad=0.6, alpha=0.85))
 
 
-def _arch_dims() -> dict[str, int]:
-    """Tensor widths taken from the implementation (models.py / preprocess.py)."""
-    from .models import N_FLAGS, N_GENRES
+def _arch_dims(cfg: Config | None = None) -> dict[str, object]:
+    """Shapes and hyper-parameters shown in the figure.
 
-    d = 64  # cfg.hidden_dim
+    Tensor widths come from the implementation (``models.py`` / ``preprocess.py``)
+    and everything tunable is read from ``cfg``; without one the repository
+    configuration is loaded, so the figure never states dimensions that the run
+    it accompanies did not use.
+    """
+    from .models import ACTION_WEIGHTS, N_FLAGS, N_GENRES
+
+    cfg = cfg or load_config()
+    d = int(cfg.hidden_dim)
     return {"d": d, "g": N_GENRES, "f": N_FLAGS, "rel_in": 4 * d + 2 * N_GENRES + N_FLAGS + 1,
             "act_in": 2 * d + 2 * N_GENRES + N_FLAGS + 1 + len(RELATIONSHIPS) + 5,
-            "ltp_in": 3 * d, "sti_in": 5 * d}
+            "ltp_in": 3 * d, "sti_in": 5 * d,
+            "max_history": int(cfg.max_history), "max_turns": int(cfg.max_context_turns),
+            "cur_items": 10, "persistence_k": int(cfg.persistence_k),
+            "top_k": ", ".join(str(k) for k in cfg.top_k),
+            "lambda_rel": f"{float(cfg.lambda_rel):g}", "lambda_act": f"{float(cfg.lambda_act):g}",
+            "action_weights": ", ".join(f"({w[0]:.2f}, {w[1]:.2f})".replace("0.", ".")
+                                        for w in ACTION_WEIGHTS.tolist())}
 
 
-def _architecture_wide():
+def _architecture_wide(cfg: Config | None = None):
     """Two-column (``figure*``) variant: 7.16 in x 4.70 in, aspect ratio 1.52 : 1."""
-    D = _arch_dims()
+    D = _arch_dims(cfg)
     d, g, f = D["d"], D["g"], D["f"]
     fig, ax = _arch_canvas(716, 470)
     fs = (5.4, 4.7, 4.2)
@@ -357,16 +372,17 @@ def _architecture_wide():
                 fontsize=4.0, color="white", zorder=3)
 
     _arch_box(ax, (18, 390, 138, 40), "inputs", "Cross-session liked-item history",
-              "positional embedding, attention pooling", f"ids [B, 50] -> h_hist [B, {d}]", fs)
+              "positional embedding, attention pooling",
+              f"ids [B, {D['max_history']}] -> h_hist [B, {d}]", fs)
     _arch_box(ax, (18, 348, 138, 38), "inputs", "Seeker profile text",
               "preference statements from\nearlier sessions", "x_prof [B, d_t]", fs)
     _arch_box(ax, (18, 302, 138, 42), "inputs", "LTP genre prior",
               "genres of past liked items,\nrecency-decayed (gamma^delta)", f"g_LTP [B, {g}]", fs)
     _arch_box(ax, (18, 244, 138, 34), "inputs", "Dialogue context",
-              "up to 6 recent seeker turns", "x_ctx [B, d_t]", fs)
+              f"up to {D['max_turns']} recent seeker turns", "x_ctx [B, d_t]", fs)
     _arch_box(ax, (18, 206, 138, 34), "inputs", "Last seeker utterance", "", "x_last [B, d_t]", fs)
     _arch_box(ax, (18, 168, 138, 34), "inputs", "In-dialogue liked items",
-              "masked mean of item embeddings", "ids [B, 10]", fs)
+              "masked mean of item embeddings", f"ids [B, {D['cur_items']}]", fs)
     _arch_box(ax, (18, 130, 138, 34), "inputs", "STI genre cues",
               "genres named in this dialogue", f"g_STI [B, {g}]", fs)
     _arch_box(ax, (18, 80, 138, 46), "inputs", "Lexical flags",
@@ -391,7 +407,7 @@ def _architecture_wide():
               "[h_LTP ; h_STI ; h_LTP * h_STI ; |h_LTP - h_STI| ;\n"
               f"g_LTP ; g_STI ; phi_flag ; cos]  ->  MLP({D['rel_in']} -> {d} -> {len(RELATIONSHIPS)})\n"
               + "  |  ".join(RELATIONSHIPS),
-              "p_rel [B, 5];  confidence-weighted CE against weak-rule /\nsynthetic labels (weak rules are not human annotations)", fs)
+              f"p_rel [B, {len(RELATIONSHIPS)}];  confidence-weighted CE against weak-rule /\nsynthetic labels (weak rules are not human annotations)", fs)
     _arch_box(ax, (338, 268, 236, 76), "arbitration", "3b  CounterfactualDiagnostic",
               "interventions on the naive-fusion scores (s_LTP + s_STI) / 2:\n"
               "drop LTP -> s_STI,   drop STI -> s_LTP\n"
@@ -403,17 +419,19 @@ def _architecture_wide():
               "[h_LTP ; h_STI ; g_LTP ; g_STI ; phi_flag ; cos ; p_rel ; phi_cf],\n"
               "or the rule policy (argmax p_rel + evidence overrides)\n"
               + "  |  ".join(ACTIONS),
-              "a [B, 4]", fs)
+              f"a [B, {len(ACTIONS)}]", fs)
     _arch_box(ax, (338, 100, 236, 52), "arbitration", "3d  Action-weighted mixing",
-              "(w_LTP, w_STI) = softmax(a) A,\nA = [(.5, .5), (.85, .15), (.15, .85), (.5, .5)]",
+              f"(w_LTP, w_STI) = softmax(a) A,\nA = [{D['action_weights']}]",
               "w [B, 2];   s = w_LTP s_LTP + w_STI s_STI  [B, N+1]", fs)
 
     _arch_box(ax, (602, 344, 104, 86), "output", "Top-K recommendation",
-              "ranked catalogue items\n(K = 10, 20; padding\ncolumn masked to -inf)", "top-K(s)", fs)
+              f"ranked catalogue items\n(K = {D['top_k']}; padding\ncolumn masked to -inf)", "top-K(s)", fs)
     _arch_box(ax, (602, 232, 104, 96), "output", "Clarification question",
               "English template that\ncontrasts the dominant\nLTP and STI genres;\nemitted when the action\nis Ask_Clarification", "", fs)
     _arch_box(ax, (602, 96, 104, 120), "output", "PersistenceTracker",
-              "counts Prioritize_STI on\nthe same genre across\ndistinct sessions of one\nseeker; >= k = 2 sessions\nis a persistent shift,\notherwise the override\nstays temporary", "", fs)
+              "counts Prioritize_STI on\nthe same genre across\ndistinct sessions of one\n"
+              f"seeker; >= k = {D['persistence_k']} sessions\nis a persistent shift,\n"
+              "otherwise the override\nstays temporary", "", fs)
 
     for y0, y1 in [(410, 408), (367, 394), (323, 380)]:
         _arch_arrow(ax, [(156, y0), (172, y1)], LTP_COLOR, rad=0.08)
@@ -456,9 +474,10 @@ def _architecture_wide():
 
     ax.text(6, 460, "AIPA-CRS: adaptive intent-preference arbitration (this implementation)",
             ha="left", va="center", fontsize=7.4, fontweight="bold", color="#1a1a1a")
-    ax.text(710, 460, "B: batch  |  N: catalogue items  |  d = 64  |  d_t: text-embedding dimension",
+    ax.text(710, 460, f"B: batch  |  N: catalogue items  |  d = {d}  |  d_t: text-embedding dimension",
             ha="right", va="center", fontsize=4.6, color="#3a3a3a")
-    ax.text(210, 51, "L = L_rec + lambda_rel L_rel + lambda_act L_act      (lambda_rel = 0.5, lambda_act = 0.3)",
+    ax.text(210, 51, "L = L_rec + lambda_rel L_rel + lambda_act L_act      "
+                     f"(lambda_rel = {D['lambda_rel']}, lambda_act = {D['lambda_act']})",
             ha="left", va="center", fontsize=5.4, fontweight="bold", color=ARCH_STYLE["training"]["text"])
     ax.text(16, 28,
             "L_rec: cross-entropy of the fused scores s against the held-out target item (stage 3d).       "
@@ -472,9 +491,9 @@ def _architecture_wide():
     return fig
 
 
-def _architecture_compact():
+def _architecture_compact(cfg: Config | None = None):
     """Single-column variant: 3.50 in x 5.16 in, aspect ratio 1 : 1.47."""
-    D = _arch_dims()
+    D = _arch_dims(cfg)
     d, g, f = D["d"], D["g"], D["f"]
     fig, ax = _arch_canvas(350, 516)
     fs = (5.0, 4.5, 4.1)
@@ -489,7 +508,7 @@ def _architecture_compact():
 
     _arch_box(ax, (10, 410, 158, 72), "inputs", "Cross-session (LTP)",
               "liked-item history with positional\nembedding and attention pooling;\nprofile text; recency-decayed\ngenre prior",
-              f"ids [B,50], x_prof [B,d_t], g_LTP [B,{g}]", fs)
+              f"ids [B,{D['max_history']}], x_prof [B,d_t], g_LTP [B,{g}]", fs)
     _arch_box(ax, (172, 410, 158, 72), "inputs", "Current dialogue (STI)",
               "context and last seeker utterance;\nin-dialogue liked items (masked\nmean); genre cues; lexical flags\n(override, negation, request, cold_user)",
               f"x_ctx, x_last [B,d_t], g_STI [B,{g}], phi_flag [B,{f}]", fs)
@@ -511,12 +530,14 @@ def _architecture_compact():
     _arch_box(ax, (10, 128, 320, 32), "arbitration", "3d  Action-weighted mixing",
               "(w_LTP, w_STI) = softmax(a) A;   s = w_LTP s_LTP + w_STI s_STI", "", fs)
 
-    _arch_box(ax, (10, 54, 158, 42), "output", "Top-K list (K = 10, 20)",
+    _arch_box(ax, (10, 54, 158, 42), "output", f"Top-K list (K = {D['top_k']})",
               "plus the template clarification\nquestion when the action is\nAsk_Clarification", "", fs)
     _arch_box(ax, (172, 54, 158, 42), "output", "PersistenceTracker",
-              "Prioritize_STI on the same genre in\n>= k = 2 sessions is folded into the\nLTP genre prior (persistent shift)", "", fs)
+              f"Prioritize_STI on the same genre in\n>= k = {D['persistence_k']} sessions is folded into the\n"
+              "LTP genre prior (persistent shift)", "", fs)
 
-    ax.text(58, 22, "L = L_rec + lambda_rel L_rel + lambda_act L_act   (0.5 / 0.3): item cross-entropy, plus confidence-weighted\n"
+    ax.text(58, 22, "L = L_rec + lambda_rel L_rel + lambda_act L_act   "
+                    f"({D['lambda_rel']} / {D['lambda_act']}): item cross-entropy, plus confidence-weighted\n"
                     "cross-entropy on the relationship (weak-rule / synthetic labels) and on the rule-derived action",
             ha="left", va="center", fontsize=4.4, color="#1c1c1c", linespacing=1.4)
 
@@ -537,23 +558,25 @@ def _architecture_compact():
 
     ax.text(4, 508, "AIPA-CRS architecture (this implementation)", ha="left", va="center",
             fontsize=6.4, fontweight="bold", color="#1a1a1a")
-    ax.text(346, 508, "B: batch | N: items | d = 64", ha="right", va="center", fontsize=4.2,
+    ax.text(346, 508, f"B: batch | N: items | d = {d}", ha="right", va="center", fontsize=4.2,
             color="#3a3a3a")
     return fig
 
 
-def architecture_diagram(compact: bool = False):
+def architecture_diagram(compact: bool = False, cfg: Config | None = None):
     """Architecture overview of the implemented model.
 
     ``compact=False`` returns the wide two-column (``figure*``) version,
-    ``compact=True`` the single-column version.  The figure is returned, not
-    saved; use :func:`save_architecture_diagrams` (or :func:`make_all`) to write
-    ``fig00_architecture{,_compact}.{png,pdf}``.
+    ``compact=True`` the single-column version.  Dimensions and hyper-parameters
+    are read from ``cfg`` (the repository configuration when it is omitted).  The
+    figure is returned, not saved; use :func:`save_architecture_diagrams` (or
+    :func:`make_all`) to write ``fig00_architecture{,_compact}.{png,pdf}``.
     """
-    return _architecture_compact() if compact else _architecture_wide()
+    return _architecture_compact(cfg) if compact else _architecture_wide(cfg)
 
 
-def save_architecture_diagrams(out: str | Path = "outputs/figures") -> dict[str, Path]:
+def save_architecture_diagrams(out: str | Path = "outputs/figures",
+                               cfg: Config | None = None) -> dict[str, Path]:
     out = Path(out)
-    return {name: _save(architecture_diagram(compact=c), out, name)[0]
+    return {name: _save(architecture_diagram(compact=c, cfg=cfg), out, name)[0]
             for name, c in [("fig00_architecture", False), ("fig00_architecture_compact", True)]}
