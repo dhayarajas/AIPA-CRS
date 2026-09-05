@@ -217,6 +217,8 @@ def inject_controlled(
         return out
     picks = rng.choice(len(candidates), size=min(n, len(candidates)), replace=False)
     kinds = list(cfg.values.get("injection_relationships", DEFAULT_INJECTION_RELATIONSHIPS))
+    if not kinds:
+        return out
     unknown = set(kinds) - set(DEFAULT_INJECTION_RELATIONSHIPS)
     if unknown:
         raise ValueError(f"injection_relationships has no templates for {sorted(unknown)}")
@@ -247,8 +249,11 @@ def inject_controlled(
         y.seeker_recent_text = (y.seeker_recent_text + " " + utt).strip()
         y.last_seeker_text = utt
         if rel == "Uncertain":
-            # the vague utterance withdraws any earlier genre cue; the target is unchanged
+            # the vague utterance replaces every current-intent cue (genre distribution,
+            # recent text and in-dialogue liked items); the target is unchanged
             y.sti_genres = {}
+            y.seeker_recent_text = utt
+            y.cur_liked_items = []
         else:
             hits = genre_hits(y.seeker_recent_text) if rel not in ("Consistent", "Complement") else {}
             boost = 2.0 * intensity

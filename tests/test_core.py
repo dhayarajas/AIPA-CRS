@@ -130,6 +130,8 @@ def test_five_class_injection(mini, cfg):
     for y in seen["Uncertain"]:
         assert y.sti_genres == {} and y.target == y.injection["original_target"]
         assert y.injection["injected_genre"] == "" and y.sample_id.startswith("syn/unc")
+        # no current-intent evidence survives from the original instance
+        assert y.seeker_recent_text == y.last_seeker_text == y.injection["utterance"] and y.cur_liked_items == []
     for y in seen["Conflict"]:
         assert y.target != y.injection["original_target"] or len(mini.movie_genres) < 2
     # the mini corpus has single-genre movies, so Complement has no co-occurring genre to inject
@@ -137,6 +139,8 @@ def test_five_class_injection(mini, cfg):
     assert inject_controlled(base, mini, c, inst["train"], seed=1) == []
     pair_pools = {frozenset(("Comedy", "Romance")): ([1, 2, 3], np.ones(3) / 3), frozenset(("Comedy", "Horror")): ([4, 5, 6], None)}
     assert complement_genres("Comedy", {"Comedy": 1.0}, pair_pools) == ["Romance"]  # Horror is a tension pair
+    c.values["injection_relationships"] = []
+    assert inject_controlled(base, mini, c, inst["train"], seed=1) == []
     c.values["injection_relationships"] = ["Nope"]
     with pytest.raises(ValueError):
         inject_controlled(base, mini, c, inst["train"], seed=1)
