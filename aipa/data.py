@@ -92,6 +92,27 @@ def _sha1(path: Path) -> str:
     return h.hexdigest()
 
 
+MOVIES_HEADER = "movieId,title,genres"
+
+
+def _movies_csv_ok(p: Path) -> bool:
+    if not p.exists() or p.stat().st_size <= 1_000_000:
+        return False
+    try:
+        with p.open(encoding="utf-8") as f:
+            if f.readline().rstrip("\r\n") != MOVIES_HEADER:
+                return False
+        with p.open("rb") as f:
+            f.seek(-4096, 2)
+            tail = f.read()
+    except (OSError, UnicodeError, ValueError):
+        return False
+    if not tail.endswith(b"\n"):
+        return False
+    last = tail.rstrip(b"\r\n").rsplit(b"\n", 1)[-1]
+    return len(list(csv.reader([last.decode("utf-8", "replace")]))[0]) == 3
+
+
 def dataset_status(cfg: Config) -> pd.DataFrame:
     rows = []
     root = cfg.path("dataset_path")
@@ -105,7 +126,7 @@ def dataset_status(cfg: Config) -> pd.DataFrame:
         p = ml / name
         rows.append({"source": "MovieLens", "file": name, "present": p.exists(),
                      "bytes": p.stat().st_size if p.exists() else 0, "expected_bytes": None,
-                     "size_ok": p.exists() and p.stat().st_size > 1_000_000})
+                     "size_ok": _movies_csv_ok(p)})
     return pd.DataFrame(rows)
 
 
@@ -159,11 +180,11 @@ def download_dataset(cfg: Config, force: bool = False) -> bool:
                 zf.extract("ml-latest/movies.csv", cfg.path("external_path"))
             z.unlink(missing_ok=True)
             csv_path = cfg.path("external_path") / "ml-latest" / "movies.csv"
-            with csv_path.open(encoding="utf-8") as f:
-                header = f.readline().strip()
-            if header != "movieId,title,genres":
+            if not _movies_csv_ok(csv_path):
+                with csv_path.open(encoding="utf-8") as f:
+                    header = f.readline().strip()
                 csv_path.unlink()
-                print(f"Downloaded movies.csv has an unexpected header {header!r}; discarded.")
+                print(f"Downloaded movies.csv is truncated or has an unexpected header {header!r}; discarded.")
                 ok = False
             else:
                 print(f"movies.csv sha1={_sha1(csv_path)} (recorded in the report for reproducibility)")
@@ -175,15 +196,22 @@ def download_dataset(cfg: Config, force: bool = False) -> bool:
 def validate_dataset(cfg: Config) -> pd.DataFrame:
     status = dataset_status(cfg)
     redial = status[status.source == "ReDial"]
-    if not redial["present"].all():
+    if not redial["size_ok"].all():
+        bad = redial[~redial.size_ok]
+        detail = ", ".join(
+            f"{r.file} ({'missing' if not r.present else f'{r.bytes} bytes, expected {r.expected_bytes}'})"
+            for r in bad.itertuples()
+        )
         raise DatasetUnavailable(
-            f"ReDial files missing under {cfg.path('dataset_path')}: "
-            f"{redial.loc[~redial.present, 'file'].tolist()}. Download from {REDIAL_URL}"
+            f"ReDial files missing or damaged under {cfg.path('dataset_path')}: {detail}. "
+            f"Re-download from {REDIAL_URL} (or run download_dataset)."
         )
     ml = status[status.source == "MovieLens"]
     if not ml["size_ok"].all():
         p = cfg.path("external_path") / "ml-latest" / "movies.csv"
-        state = "missing" if not ml["present"].all() else f"truncated ({p.stat().st_size} bytes)"
+        state = ("missing" if not ml["present"].all()
+                 else f"truncated or not a MovieLens file ({p.stat().st_size} bytes, "
+                      f"expected header {MOVIES_HEADER!r})")
         raise DatasetUnavailable(
             f"MovieLens genre metadata {state}: expected a complete {p}. Genres drive the "
             "LTP/STI signals and the relationship labels, so the pipeline refuses to run without "
@@ -272,7 +300,9 @@ def load_dataset(cfg: Config, use_cache: bool = True, valid_fraction: float = 0.
     ml_csv = cfg.path("external_path") / "ml-latest" / "movies.csv"
     hashes = {n: _sha1(root / n) for n in REDIAL_FILES}
     hashes["movies.csv"] = _sha1(ml_csv)
-    cache = cfg.path("interim_path") / f"redial_parsed_{hashlib.sha1(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:12]}.pkl"
+    split_key = {"file_hashes": hashes, "seed": cfg.seed, "valid_fraction": valid_fraction}
+    cache = cfg.path("interim_path") / (
+        f"redial_parsed_{hashlib.sha1(json.dumps(split_key, sort_keys=True).encode()).hexdigest()[:12]}.pkl")
     if use_cache and cache.exists():
         with cache.open("rb") as f:
             return pickle.load(f)
