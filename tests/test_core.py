@@ -1,16 +1,26 @@
 """Fast unit tests (synthetic mini-corpus; no download required)."""
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 import pytest
 import torch
 
 from aipa import ACTIONS, RELATIONSHIPS
 from aipa.config import load_config
+from aipa.data import GENRES as ALL_GENRES
 from aipa.data import Dialogue, ReDial
 from aipa.evaluate import arbitration_metrics, bootstrap_ci, paired_test, per_sample_ranking, relationship_metrics
 from aipa.labeling import REL2ACTION, complement_genres, inject_controlled, label_all
-from aipa.models import ACTION_WEIGHTS, CounterfactualDiagnostic, build_model, clarification_question
+from aipa.models import (
+    ACTION_WEIGHTS,
+    BASELINE_NAMES,
+    CounterfactualDiagnostic,
+    build_model,
+    clarification_question,
+    left_align,
+)
 from aipa.preprocess import ItemIndex, SeekerMemory, build_instances, marker_hits, tensorise
 from aipa.train import instance_weights, label_tensors, rec_loss, self_train_relabel
 
@@ -240,6 +250,97 @@ def test_self_training_relabels_only_low_confidence_weak_labels(mini, cfg):
     assert self_train_relabel(model, X, Y, cfg, min_conf=0.6, threshold=0.0)[1] == 0
 
 
+def test_item_text_enriches_title_with_genres(mini):
+    from aipa.preprocess import item_text, item_texts
+
+    assert item_text(mini, 6) == "Movie 6 (1996). Genres: Comedy"
+    assert item_text(mini, 6, with_genres=False) == "Movie 6 (1996)"
+    bare = ReDial(dialogues=mini.dialogues, movie_titles=mini.movie_titles, movie_genres={}, movie_year=mini.movie_year, source="t")
+    assert item_text(bare, 6) == "Movie 6 (1996)"  # no genres known -> plain title
+    c = load_config("quick")
+    c.values.update(item_text_genres=False)
+    assert item_texts(mini, c) == [mini.movie_titles[m] for m in sorted(mini.movie_titles)]
+
+
+def test_tfidf_encoder_zero_for_empty_and_unit_norm(mini, cfg):
+    from aipa.preprocess import TextEncoder
+
+    enc = TextEncoder(cfg).fit(["funny comedy movie", "scary horror film", "war drama"] * 3 + list(mini.movie_titles.values()))
+    assert not enc.is_pretrained and enc.dim == cfg.text_dim
+    Z = enc.encode(["a funny comedy", "", "   "])
+    assert Z.shape == (3, cfg.text_dim) and np.allclose(Z[1:], 0) and np.isclose(np.linalg.norm(Z[0]), 1.0, atol=1e-4)
+    assert enc.encode([]).shape == (0, cfg.text_dim)
+    assert enc.summary()["name"] == "tfidf-svd" and enc.summary()["fallback_reason"] is None
+
+
+def test_unavailable_pretrained_model_falls_back_or_raises(cfg):
+    from aipa.preprocess import TextEncoder
+
+    c = load_config("quick")
+    c.values.update(cfg.values, embedding_model="sentence-transformers/this-model-does-not-exist-aipa", embedding_fallback=True)
+    enc = TextEncoder(c)
+    assert enc.name == "tfidf-svd" and enc.requested == c.embedding_model and enc.fallback_reason
+    c.values["embedding_fallback"] = False
+    with pytest.raises(RuntimeError, match="unavailable"):
+        TextEncoder(c)
+
+
+def test_embedding_cache_roundtrip(tmp_path):
+    from aipa.preprocess import EmbeddingCache
+
+    p = tmp_path / "text_cache_x.npz"
+    c = EmbeddingCache(p, 4)
+    c.put("k1", np.arange(4, dtype=np.float32))
+    c.save()
+    assert p.exists() and not c.dirty
+    c2 = EmbeddingCache(p, 4)
+    assert len(c2) == 1 and np.array_equal(c2.get("k1"), np.arange(4, dtype=np.float32)) and c2.get("k2") is None
+    assert len(EmbeddingCache(p, 8)) == 0  # dimension mismatch -> ignored, not mixed
+
+
+@pytest.fixture(scope="module")
+def minilm_cfg(cfg, tmp_path_factory):
+    pytest.importorskip("sentence_transformers")
+    c = load_config("quick")
+    c.values.update(cfg.values, embedding_model="sentence-transformers/all-MiniLM-L6-v2", embedding_fallback=False,
+                    interim_path=str(tmp_path_factory.mktemp("interim")))
+    try:
+        from aipa.preprocess import TextEncoder
+
+        TextEncoder(c)
+    except Exception as exc:  # weights not downloadable offline
+        pytest.skip(f"MiniLM unavailable: {exc}")
+    return c
+
+
+def test_minilm_encoder_dim_cache_and_model_shapes(mini, minilm_cfg):
+    from aipa.preprocess import TextEncoder, build_item_index
+
+    c = minilm_cfg
+    enc = TextEncoder(c).fit([])
+    assert enc.is_pretrained and enc.dim == 384
+    Z = enc.encode(["a funny comedy", "", "a funny comedy", "a scary horror film"])
+    assert Z.shape == (4, 384) and np.allclose(Z[1], 0) and np.array_equal(Z[0], Z[2])
+    assert np.isclose(np.linalg.norm(Z[0]), 1.0, atol=1e-4)
+    assert enc.n_encoded == 2 and enc.n_cache_hits == 0  # duplicates inside one call are encoded once
+    # semantic neighbour: comedy query closer to comedy paraphrase than to horror
+    Q = enc.encode(["something hilarious to laugh at"])
+    assert Q @ Z[0] > Q @ Z[3]
+    # second encoder instance reads the on-disk cache and re-encodes nothing
+    enc2 = TextEncoder(c)
+    Z2 = enc2.encode(["a funny comedy", "a scary horror film"])
+    assert enc2.n_encoded == 0 and enc2.n_cache_hits == 2 and np.array_equal(Z2[0], Z[0])
+    assert enc2.summary()["cache_path"].endswith("text_cache_sentence-transformers_all-MiniLM-L6-v2_" + hashlib.sha1(c.embedding_model.encode()).hexdigest()[:8] + ".npz")
+    inst = build_instances(mini, c)
+    index = build_item_index(mini, enc, c)
+    assert index.content.shape[1] == 384 + len(ALL_GENRES)
+    X = tensorise(inst["train"], enc, index, c)
+    assert X["profile"].shape[1] == X["context"].shape[1] == 384
+    for name in ["Conversation-aware", "AIPA (full)"]:
+        model = build_model(name, index.content, c)
+        assert model(X)["scores"].shape == (X["target"].shape[0], index.n)
+
+
 def test_models_forward_shapes(mini, cfg):
     from aipa.preprocess import TextEncoder, build_item_index
 
@@ -249,11 +350,195 @@ def test_models_forward_shapes(mini, cfg):
     X = tensorise(inst["train"], enc, index, cfg)
     Y = label_tensors(label_all(inst["train"], cfg))
     assert Y["rel"].shape[0] == X["target"].shape[0]
-    for name in ["LTP-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware", "AIPA (rule policy)", "AIPA (full)"]:
+    for name in BASELINE_NAMES + ["AIPA (rule policy)", "AIPA (full)"]:
         model = build_model(name, index.content, cfg)
         out = model(X)
         assert out["scores"].shape == (X["target"].shape[0], index.n)
+        assert torch.isfinite(out["scores"][:, 1:]).all() and (out["scores"][:, 0] < -1e8).all()
+        assert model.parameter_count() > 0
         if name.startswith("AIPA"):
             assert out["rel_logits"].shape[1] == len(RELATIONSHIPS) and out["act_logits"].shape[1] == len(ACTIONS)
             w = torch.stack([out["w_ltp"], out["w_sti"]], 1)
             assert torch.allclose(w.sum(1), torch.ones(w.shape[0]), atol=1e-4)
+
+
+def test_js_divergence_bounds_and_symmetry():
+    from aipa.evaluate import js_divergence
+
+    assert js_divergence({"Comedy": 1.0}, {"Comedy": 1.0}) == pytest.approx(0.0)
+    assert js_divergence({"Comedy": 1.0}, {"Horror": 1.0}) == pytest.approx(1.0)
+    a, b = {"Comedy": 0.7, "Drama": 0.3}, {"Drama": 0.5, "Horror": 0.5}
+    assert 0.0 < js_divergence(a, b) < 1.0
+    assert js_divergence(a, b) == pytest.approx(js_divergence(b, a))
+    assert np.isnan(js_divergence({}, {"Comedy": 1.0}))
+
+
+def test_pooled_paired_test_pools_within_seed():
+    from aipa.evaluate import cliffs_delta, permutation_test, pooled_paired_test
+
+    rng = np.random.RandomState(0)
+    base = {s: rng.rand(40) for s in (1, 2, 3)}
+    treat = {s: base[s] + 0.2 + rng.normal(0, 0.01, 40) for s in base}
+    r = pooled_paired_test(treat, base)
+    assert r["n"] == 120 and r["n_samples"] == 40 and r["n_seeds"] == 3
+    assert r["mean_diff"] == pytest.approx(0.2, abs=0.01)
+    assert r["seed_std_diff"] < 0.01
+    assert r["perm_p"] < 0.01 and r["t_p"] < 0.01
+    assert -1.0 <= r["cliffs_delta"] <= 1.0
+    # a seed-level mean shift with no within-seed difference must not be significant
+    same = {s: base[s] for s in base}
+    r0 = pooled_paired_test(same, base)
+    assert np.isnan(r0["perm_p"]) and r0["mean_diff"] == 0.0
+    assert cliffs_delta(np.ones(5), np.zeros(5)) == pytest.approx(1.0)
+    assert 0.0 <= permutation_test(np.array([0.1, -0.1, 0.05, -0.05, 0.0]), n_perm=200) <= 1.0
+
+
+def test_disagreement_mask_is_superset_of_strict(mini, cfg):
+    import pandas as pd
+
+    from aipa.labeling import disagreement_mask, labels_frame, strict_conflict_mask
+
+    inst = build_instances(mini, cfg)
+    test = inst["test"] + inject_controlled(inst["test"], mini, cfg, inst["train"], 1)
+    lab = labels_frame(test, label_all(test, cfg))
+    assert "js_divergence" in lab and lab.js_divergence.dropna().between(0, 1).all()
+    strict, broad = strict_conflict_mask(lab, cfg), disagreement_mask(lab, cfg)
+    assert not (strict & ~broad).any()
+    assert not (broad & lab.is_synthetic.values).any()
+    # a confident, divergent non-Conflict natural instance joins the broad subset only
+    fake = pd.DataFrame({"relationship_label": ["Consistent", "Conflict", "Consistent", "Uncertain"],
+                         "confidence": [0.9, 0.5, 0.9, 0.9], "js_divergence": [1.0, 0.0, 0.1, np.nan],
+                         "is_synthetic": [False, False, False, False]})
+    assert disagreement_mask(fake, cfg).tolist() == [True, True, False, False]
+    assert strict_conflict_mask(fake, cfg).tolist() == [False, True, False, False]
+
+
+def test_history_buckets_follow_config(cfg):
+    from aipa.experiments import history_bucket
+
+    b = history_bucket([0, 2, 3, 9, 10, 24, 25, 200], cfg)
+    assert list(b.astype(str)) == ["cold", "cold", "short", "short", "mid", "mid", "long", "long"]
+
+
+def test_persistence_tracker_fires_after_k_sessions_in_order():
+    from aipa.models import PersistenceTracker
+
+    tr = PersistenceTracker(k=2, gain=0.3)
+    ltp = torch.tensor([0.5, 0.5] + [0.0] * 16)
+    ltp = ltp / ltp.sum()
+    assert torch.allclose(tr.adjust("A", ltp), ltp)
+    tr.observe("A", 1, "Prioritize_STI", {"Horror": 1.0})
+    tr.observe("A", 1, "Prioritize_STI", {"Horror": 1.0})  # same session counted once
+    assert not tr.shifts and torch.allclose(tr.adjust("A", ltp), ltp)
+    tr.observe("A", 2, "Fuse", {"Horror": 1.0})  # not a prioritisation -> ignored
+    tr.observe("A", 3, "Prioritize_STI", {"Horror": 1.0})
+    assert len(tr.shifts) == 1 and tr.shifts[0]["genre"] == "Horror"
+    adj = tr.adjust("A", ltp)
+    assert not torch.allclose(adj, ltp) and adj.sum() == pytest.approx(1.0)
+    assert torch.allclose(tr.adjust("B", ltp), ltp)
+
+
+def test_persistence_override_is_chronological_and_marks_affected(mini, cfg):
+    from aipa.experiments import _persistence_override, _sessions_per_seeker
+
+    inst = build_instances(mini, cfg)
+    test = sorted(inst["test"], key=lambda x: (-x.conv_id, -x.turn))  # deliberately reverse order
+    n_sess = _sessions_per_seeker(test)
+    assert set(n_sess) == {1}
+    X = {"ltp_genres": torch.rand(len(test), 18)}
+    X["ltp_genres"] = X["ltp_genres"] / X["ltp_genres"].sum(1, keepdim=True)
+    pred = {"act_logits": np.tile(np.eye(len(ACTIONS))[ACTIONS.index("Prioritize_STI")], (len(test), 1))}
+    override, shifts, affected = _persistence_override(None, test, X, pred, cfg, k=1)
+    # with k=1 the first Prioritize_STI turn of each seeker creates a shift; only *later* turns of that seeker are affected
+    assert len(shifts) >= 1 and affected.sum() >= 1
+    first_turn = {x.seeker_id: min(y.turn for y in test if y.seeker_id == x.seeker_id) for x in test}
+    for i, x in enumerate(test):
+        if x.turn == first_turn[x.seeker_id]:
+            assert not affected[i]
+    assert torch.allclose(override[~torch.tensor(affected)], X["ltp_genres"][~torch.tensor(affected)])
+    _, shifts_k5, affected_k5 = _persistence_override(None, test, X, pred, cfg, k=5)
+    assert not shifts_k5 and not affected_k5.any()
+
+
+def test_architecture_figure_reports_the_active_config(cfg):
+    import matplotlib.pyplot as plt
+
+    from aipa.figures import architecture_diagram
+
+    cfg.values.update(hidden_dim=16, max_history=7, max_context_turns=3, persistence_k=4,
+                      top_k=[5], lambda_rel=0.25, lambda_act=0.75)
+    for compact in (False, True):
+        fig = architecture_diagram(compact=compact, cfg=cfg)
+        text = " ".join(t.get_text() for t in fig.axes[0].texts)
+        plt.close(fig)
+        assert "d = 16" in text
+        assert f"MLP({3 * 16} -> 16 -> 16)" in text and f"MLP({5 * 16} -> 16 -> 16)" in text
+        assert "[B, 7]" in text or "[B,7]" in text
+        assert "k = 4" in text and "K = 5" in text
+        assert "0.25" in text and "0.75" in text
+
+
+def test_left_align_keeps_order_and_moves_padding_front():
+    ids = torch.tensor([[0, 3, 0, 5, 7], [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]])
+    out = left_align(ids)
+    assert out.tolist() == [[0, 0, 3, 5, 7], [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]]
+
+
+def test_sasrec_is_causal_and_handles_empty_sequences(mini, cfg):
+    from aipa.models import SASRecBaseline
+
+    content = torch.randn(30, 8 + 19)
+    m = SASRecBaseline(content, text_dim=8, hidden=16, max_history=6, n_blocks=2, n_heads=2, dropout=0.0).eval()
+    hist = torch.tensor([[0, 0, 0, 3, 4, 5], [0, 0, 0, 0, 0, 0]])
+    cur = torch.zeros(2, 10, dtype=torch.long)
+    out = m({"history": hist, "cur_items": cur})["scores"]
+    assert torch.isfinite(out[:, 1:]).all()
+    # empty sequence -> zero encoding -> item bias only (all-zero here)
+    assert torch.allclose(out[1, 1:], m.items.bias[1:])
+    # causal mask: changing the last item must not alter the states of earlier positions
+    with torch.no_grad():
+        h_a, _ = m.states(torch.tensor([[0, 0, 3, 4, 5, 9]]))
+        h_b, _ = m.states(torch.tensor([[0, 0, 3, 4, 5, 7]]))
+    assert torch.allclose(h_a[0, :5], h_b[0, :5], atol=1e-6)
+    assert not torch.allclose(h_a[0, 5], h_b[0, 5])
+    # history then cur_items: an item in cur_items is the most recent position
+    with torch.no_grad():
+        joint = m.encode(torch.cat([torch.tensor([[0, 0, 0, 3, 4, 5]]), torch.tensor([[0, 0, 0, 9]])], 1))
+        flat = m.encode(torch.tensor([[0, 0, 0, 0, 0, 0, 3, 4, 5, 9]]))
+    assert torch.allclose(joint, flat, atol=1e-6)
+
+
+def test_kbrd_pooling_modes_and_genre_bias(mini, cfg):
+    from aipa.models import N_GENRES, KBRDBaseline
+
+    content = torch.zeros(20, 8 + N_GENRES)
+    content[5, 8] = 1.0  # item 5 carries genre 0
+    batch = {"cur_items": torch.tensor([[0, 0, 3, 4]]), "sti_genres": torch.zeros(1, N_GENRES),
+             "context": torch.randn(1, 8), "last": torch.randn(1, 8)}
+    batch["sti_genres"][0, 0] = 1.0
+    for pooling in ["attention", "mean"]:
+        m = KBRDBaseline(content, text_dim=8, hidden=16, max_history=6, pooling=pooling).eval()
+        s = m(batch)["scores"]
+        assert s.shape == (1, 20) and torch.isfinite(s[:, 1:]).all()
+    with pytest.raises(ValueError):
+        KBRDBaseline(content, text_dim=8, hidden=16, max_history=6, pooling="max")
+    # genre bias: with a positive weight on genre 0 the item carrying that genre gains score
+    m = KBRDBaseline(content, text_dim=8, hidden=16, max_history=6).eval()
+    with torch.no_grad():
+        m.genre_bias.weight.zero_()
+        base = m(batch)["scores"].clone()
+        m.genre_bias.weight[0, 0] = 2.0
+        biased = m(batch)["scores"]
+    assert torch.isclose(biased[0, 5] - base[0, 5], torch.tensor(2.0))
+    assert torch.isclose(biased[0, 6], base[0, 6])
+
+
+def test_disabled_models_removed_from_experiment_loop():
+    from aipa.experiments import MODEL_ORDER
+
+    cfg = load_config("quick")
+    assert "SASRec" in MODEL_ORDER and "KBRD-style" in MODEL_ORDER
+    cfg.values["disabled_models"] = ["SASRec", "KBRD-style"]
+    disabled = set(cfg.disabled_models)
+    kept = [m for m in MODEL_ORDER if m not in disabled]
+    assert "SASRec" not in kept and "AIPA (full)" in kept

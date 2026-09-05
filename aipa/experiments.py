@@ -4,6 +4,7 @@ under ``outputs/results`` as CSV / JSON so that figures, tables and the report
 are generated from files, never from values typed by hand."""
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -21,11 +22,18 @@ from .evaluate import (
     calibration,
     driver_summary,
     holm_bonferroni,
-    paired_test,
     per_sample_ranking,
+    pooled_paired_test,
     relationship_metrics,
 )
-from .labeling import inject_controlled, label_all, labels_frame, load_human_verified
+from .labeling import (
+    disagreement_mask,
+    inject_controlled,
+    label_all,
+    labels_frame,
+    load_human_verified,
+    strict_conflict_mask,
+)
 from .models import AIPA, BASELINE_NAMES, PersistenceTracker, clarification_question
 from .preprocess import (
     Instance,
@@ -34,6 +42,7 @@ from .preprocess import (
     build_instances,
     build_item_index,
     instances_frame,
+    item_texts,
     load_instances,
     save_instances,
     tensorise,
@@ -67,16 +76,17 @@ class Results:
 
 def prepare(cfg: Config, verbose: bool = True):
     ds = load_dataset(cfg)
-    name = f"instances_{cfg.run_mode}_s{cfg.seed}_f{cfg.subset_fraction}"
+    data_tag = hashlib.sha1(json.dumps(ds.file_hashes, sort_keys=True).encode()).hexdigest()[:12]
+    name = f"instances_{cfg.run_mode}_s{cfg.seed}_f{cfg.subset_fraction}_{data_tag}"
     inst = load_instances(cfg, name)
     if inst is None:
         inst = build_instances(ds, cfg)
         save_instances(inst, cfg, name)
     enc = TextEncoder(cfg).fit(
         [x.seeker_recent_text for x in inst["train"]] + [" ".join(x.profile_sentences) for x in inst["train"]]
-        + list(ds.movie_titles.values())
+        + item_texts(ds, cfg)
     )
-    index = build_item_index(ds, enc)
+    index = build_item_index(ds, enc, cfg)
     syn_train = inject_controlled(inst["train"], ds, cfg, inst["train"], cfg.seed)
     syn_test = inject_controlled(inst["test"], ds, cfg, inst["train"], cfg.seed + 1)
     human = load_human_verified(cfg)
@@ -93,38 +103,86 @@ def prepare(cfg: Config, verbose: bool = True):
         "valid": tensorise(inst["valid"], enc, index, cfg),
         "test": tensorise(test_all, enc, index, cfg),
     }
+    if verbose:
+        s = enc.summary()
+        print(f"text encoder: {s['name']} (dim={s['dim']}) encoded {s['n_newly_encoded']} new strings, "
+              f"{s['n_cache_hits']} cache hits, {s['encode_seconds']}s")
     return ds, enc, index, {"train": train_all, "valid": inst["valid"], "test": test_all}, {
         "train": lab_train, "valid": lab_valid, "test": lab_test}, tensors, human
 
 
-def _persistence_override(model: AIPA, test_inst: list[Instance], X: dict, pred: dict, cfg: Config) -> tuple[torch.Tensor, list[dict]]:
-    tracker = PersistenceTracker(k=cfg.persistence_k, gain=cfg.persistence_gain)
+def _persistence_override(model: AIPA, test_inst: list[Instance], X: dict, pred: dict, cfg: Config,
+                          k: int | None = None) -> tuple[torch.Tensor, list[dict], np.ndarray]:
+    """Replay the persistence tracker over the natural instances of a split in
+    chronological order per seeker (``conv_id`` then ``turn``).  Every
+    recommendation turn is observed (a genre counts once per session), and the
+    adjusted LTP prior is applied to all later turns of that seeker.  Returns
+    the adjusted ``ltp_genres`` tensor, the detected shifts and a boolean mask
+    of the instances whose prior was actually changed."""
+    tracker = PersistenceTracker(k=k if k is not None else cfg.persistence_k, gain=cfg.persistence_gain)
     order = sorted(range(len(test_inst)), key=lambda i: (test_inst[i].seeker_id, test_inst[i].conv_id, test_inst[i].turn))
     acts = pred["act_logits"].argmax(1)
     override = X["ltp_genres"].clone()
-    seen_sessions: set[tuple[str, int]] = set()
+    affected = np.zeros(len(test_inst), bool)
     for i in order:
         x = test_inst[i]
         if x.is_synthetic:
             continue
-        override[i] = tracker.adjust(x.seeker_id, X["ltp_genres"][i])
-        key = (x.seeker_id, x.conv_id)
-        if key not in seen_sessions:
-            tracker.observe(x.seeker_id, x.conv_id, ACTIONS[int(acts[i])], x.sti_genres)
-            seen_sessions.add(key)
-    return override, tracker.shifts
+        adj = tracker.adjust(x.seeker_id, X["ltp_genres"][i])
+        if not torch.allclose(adj, X["ltp_genres"][i]):
+            override[i] = adj
+            affected[i] = True
+        tracker.observe(x.seeker_id, x.conv_id, ACTIONS[int(acts[i])], x.sti_genres)
+    return override, tracker.shifts, affected
+
+
+def _sessions_per_seeker(instances: list[Instance]) -> np.ndarray:
+    """Number of distinct (natural) sessions of each instance's seeker within the split."""
+    sess: dict[str, set[int]] = {}
+    for x in instances:
+        if not x.is_synthetic:
+            sess.setdefault(x.seeker_id, set()).add(x.conv_id)
+    return np.array([len(sess.get(x.seeker_id, ())) for x in instances])
+
+
+def _persistence_sweep(model: AIPA, inst: list[Instance], X: dict, cfg: Config, seed: int, split: str) -> list[dict]:
+    """Effect of the tracker for each k in ``persistence_k_grid`` on one split."""
+    base = predict(model, X, cfg)
+    n_sess = _sessions_per_seeker(inst)
+    nat = np.array([not x.is_synthetic for x in inst])
+    multi = nat & (n_sess >= cfg.persistence_min_sessions)
+    rows = []
+    for k in cfg.persistence_k_grid:
+        override, shifts, affected = _persistence_override(model, inst, X, base, cfg, k=k)
+        rank_b = base["rank"]
+        rank_w = predict(model, X, cfg, ltp_override=override)["rank"] if affected.any() else rank_b
+        hit_b, hit_w = (rank_b <= 10).astype(float), (rank_w <= 10).astype(float)
+        rows.append({
+            "split": split, "seed": seed, "k": k, "n_shifts": len(shifts), "n_seekers_shifted": len({s["seeker_id"] for s in shifts}),
+            "n_multi_session": int(multi.sum()), "n_seekers_multi_session": len({inst[i].seeker_id for i in np.flatnonzero(multi)}),
+            "n_affected": int(affected.sum()),
+            "hit10_multi_without": float(hit_b[multi].mean()) if multi.any() else np.nan,
+            "hit10_multi_with": float(hit_w[multi].mean()) if multi.any() else np.nan,
+            "hit10_affected_without": float(hit_b[affected].mean()) if affected.any() else np.nan,
+            "hit10_affected_with": float(hit_w[affected].mean()) if affected.any() else np.nan,
+            "n_rank_changed": int((rank_b != rank_w).sum()),
+        })
+    return rows
 
 
 def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None = None, prepared: tuple | None = None) -> Results:
     t_start = time.perf_counter()
     ds, enc, index, inst, labels, X, human = prepared or prepare(cfg, verbose)
-    models = models or MODEL_ORDER
+    disabled = set(cfg.values.get("disabled_models", []))
+    models = models or [m for m in MODEL_ORDER if m not in disabled]
     Y = {k: label_tensors(v) for k, v in labels.items()}
     test_inst = inst["test"]
     test_meta = instances_frame(test_inst)
     lab_df = labels_frame(test_inst, labels["test"])
 
-    rows, eff_rows, curve_rows, cf_rows, shift_rows, alpha_rows = [], [], [], [], [], []
+    rows, eff_rows, curve_rows, cf_rows, shift_rows, alpha_rows, persist_rows = [], [], [], [], [], [], []
+    test_sessions = _sessions_per_seeker(test_inst)
+    affected_by_seed: dict[int, np.ndarray] = {}
     status = {"human_verified_labels": "RUN" if human is not None else "NOT RUN (no data/annotations/human_verified.csv provided)"}
     trained_primary = {}
     for seed in cfg.seeds:
@@ -140,10 +198,15 @@ def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None 
                 curve_rows.append({"model": name, "seed": seed, **h})
             is_aipa_full = isinstance(model, AIPA) and model.variant.fusion == "aipa"
             if is_aipa_full and model.variant.use_persist:
-                override, shifts = _persistence_override(model, test_inst, X["test"], pred, cfg)
-                pred = predict(model, X["test"], cfg, ltp_override=override)
+                override, shifts, affected = _persistence_override(model, test_inst, X["test"], pred, cfg)
+                if affected.any():
+                    pred = predict(model, X["test"], cfg, ltp_override=override)
                 for s in shifts:
                     shift_rows.append({"model": name, "seed": seed, **s})
+                if name == PRIMARY:
+                    affected_by_seed[seed] = affected
+                    persist_rows += _persistence_sweep(model, inst["valid"], X["valid"], cfg, seed, "valid")
+                    persist_rows += _persistence_sweep(model, test_inst, X["test"], cfg, seed, "test")
             df = per_sample_ranking(pred["rank"], ks=tuple(cfg.top_k))
             df.insert(0, "sample_id", [x.sample_id for x in test_inst])
             df.insert(0, "seed", seed)
@@ -199,11 +262,15 @@ def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None 
         alpha_sweep=pd.DataFrame(alpha_rows), status=status,
     )
     res.extra["primary_models"] = trained_primary
+    res.extra["persistence_sweep"] = pd.DataFrame(persist_rows)
+    res.extra["persistence_affected"] = affected_by_seed
+    res.extra["test_sessions_per_seeker"] = test_sessions
     res.extra["index"] = index
     res.extra["ds"] = ds
     res.extra["test_instances"] = test_inst
     res.extra["test_tensors"] = X["test"]
     res.extra["train_labels"] = labels_frame(inst["train"], labels["train"])
+    res.extra["text_encoder"] = enc.summary()
     res.extra["dataset_source"] = ds.source
     res.extra["file_hashes"] = ds.file_hashes
     res.extra["n_train"] = len(inst["train"])
@@ -285,23 +352,29 @@ def aggregate(per_sample: pd.DataFrame, mask: np.ndarray | pd.Series, cfg: Confi
 
 
 def significance(per_sample: pd.DataFrame, mask, cfg: Config, metric: str = "Hit@10", treatment: str = PRIMARY) -> pd.DataFrame:
+    """Paired tests of ``treatment`` against every other model.  Differences are
+    formed per sample *within* each seed and pooled over seeds (``n`` = samples x
+    seeds); p-values are Holm-corrected within the table."""
     m = np.asarray(mask, bool)
     ids = per_sample.attrs["sample_ids"]
     keep_ids = set(ids[m])
     sub = per_sample[per_sample.sample_id.isin(keep_ids)]
-    piv = sub.pivot_table(index="sample_id", columns="model", values=metric, aggfunc="mean")
-    if treatment not in piv:
+    piv = sub.pivot_table(index="sample_id", columns=["model", "seed"], values=metric, aggfunc="mean")
+    models = piv.columns.get_level_values(0).unique()
+    if treatment not in models:
         return pd.DataFrame()
+    treat = {s: piv[(treatment, s)].values for s in piv[treatment].columns}
     rows = []
-    for model in piv.columns:
+    for model in models:
         if model == treatment:
             continue
-        r = paired_test(piv[treatment].values, piv[model].values)
+        ctrl = {s: piv[(model, s)].values for s in piv[model].columns}
+        r = pooled_paired_test(treat, ctrl, n_perm=cfg.permutation_samples, seed=0)
         rows.append({"treatment": treatment, "control": model, "metric": metric, **r})
     df = pd.DataFrame(rows)
     if len(df):
-        df["t_p_holm"] = holm_bonferroni(df["t_p"].tolist())
-        df["wilcoxon_p_holm"] = holm_bonferroni(df["wilcoxon_p"].tolist())
+        for c in ["t_p", "wilcoxon_p", "perm_p"]:
+            df[f"{c}_holm"] = holm_bonferroni(df[c].tolist())
     return df
 
 
@@ -319,22 +392,39 @@ def build_tables(res: Results) -> None:
         m2 = syn & (rel == r)
         T[f"subset_{r}_synthetic"] = aggregate(ps, m2, cfg) if m2.sum() >= 5 else pd.DataFrame()
     conflict = np.isin(rel, ["Conflict", "Override"])
-    T["conflict_natural"] = aggregate(ps, nat & conflict, cfg) if (nat & conflict).sum() >= 5 else pd.DataFrame()
-    T["nonconflict_natural"] = aggregate(ps, nat & ~conflict, cfg)
+    strict = strict_conflict_mask(lab, cfg)
+    broad = disagreement_mask(lab, cfg)
+    subsets = {"strict": strict, "broad": broad}
+    res.extra["conflict_subsets"] = subsets
+    conf_tabs = []
+    for name, m in subsets.items():
+        if m.sum() >= 5:
+            t = aggregate(ps, m, cfg)
+            t.insert(0, "subset", name)
+            conf_tabs.append(t)
+    T["conflict_natural"] = pd.concat(conf_tabs, ignore_index=True) if conf_tabs else pd.DataFrame()
+    T["nonconflict_natural"] = aggregate(ps, nat & ~broad, cfg)
     T["conflict_synthetic"] = aggregate(ps, syn & conflict, cfg) if (syn & conflict).sum() >= 5 else pd.DataFrame()
-    # significance
-    sig = [significance(ps, nat, cfg, "Hit@10"), significance(ps, nat, cfg, "NDCG@10")]
-    if (nat & conflict).sum() >= 5:
-        for d in (significance(ps, nat & conflict, cfg, "Hit@10"), significance(ps, nat & conflict, cfg, "NDCG@10")):
-            d["subset"] = "conflict_natural"
-            sig.append(d)
-    if (syn & conflict).sum() >= 5:
-        d = significance(ps, syn & conflict, cfg, "Hit@10")
-        d["subset"] = "conflict_synthetic"
-        sig.append(d)
-    for d in sig[:2]:
-        d["subset"] = "natural"
-    T["significance"] = pd.concat([d for d in sig if len(d)], ignore_index=True) if any(len(d) for d in sig) else pd.DataFrame()
+    T["conflict_subset_sizes"] = pd.DataFrame([
+        {"subset": "strict", "definition": "weak-rule label in " + "/".join(cfg.conflict_strict_labels), "n": int(strict.sum())},
+        {"subset": "broad", "definition": f"Conflict/Override or (confidence >= {cfg.disagreement_conf_min} and JS(ltp, sti) >= {cfg.disagreement_js_min})",
+         "n": int(broad.sum())},
+        {"subset": "broad_only", "definition": "broad minus strict", "n": int((broad & ~strict).sum())},
+        {"subset": "synthetic_conflict", "definition": "synthetic Conflict/Override", "n": int((syn & conflict).sum())},
+        {"subset": "natural", "definition": "all natural test instances", "n": int(nat.sum())},
+    ])
+    # significance (differences within seed, pooled over seeds)
+    sig = []
+    for subset, m in [("natural", nat), ("conflict_natural_strict", strict), ("conflict_natural_broad", broad),
+                      ("conflict_synthetic", syn & conflict)]:
+        if m.sum() < 5:
+            continue
+        for metric in (["Hit@10", "NDCG@10"] if subset != "conflict_synthetic" else ["Hit@10"]):
+            d = significance(ps, m, cfg, metric)
+            if len(d):
+                d["subset"] = subset
+                sig.append(d)
+    T["significance"] = pd.concat(sig, ignore_index=True) if sig else pd.DataFrame()
     # relationship / arbitration / calibration / drivers per AIPA model
     rel_true = lab.relationship_label.map({r: i for i, r in enumerate(RELATIONSHIPS)}).values
     act_true = lab.gold_action.map({a: i for i, a in enumerate(ACTIONS)}).values
@@ -376,15 +466,30 @@ def build_tables(res: Results) -> None:
     prim["intensity"] = prim.sample_id.map(lab.set_index("sample_id").intensity)
     prim["relationship_label"] = prim.sample_id.map(lab.set_index("sample_id").relationship_label)
     natp = prim[~prim.is_synthetic]
-    natp = natp.assign(history_bucket=pd.cut(natp.history_len, [-1, 2, 10, 25, 50, 10_000], labels=["0-2", "3-10", "11-25", "26-50", ">50"]),
+    natp = natp.assign(history_bucket=history_bucket(natp.history_len, cfg),
                        sti_bucket=pd.cut(natp.seeker_turns, [-1, 1, 3, 6, 10_000], labels=["1", "2-3", "4-6", ">6"]))
     T["sens_history"] = natp.groupby("history_bucket", observed=True).agg(n=("sample_id", "nunique"), **{c: (c, "mean") for c in _metric_cols(cfg)}).reset_index()
     T["sens_sti_length"] = natp.groupby("sti_bucket", observed=True).agg(n=("sample_id", "nunique"), **{c: (c, "mean") for c in _metric_cols(cfg)}).reset_index()
     all_models = ps.copy()
     all_models["intensity"] = all_models.sample_id.map(lab.set_index("sample_id").intensity)
     all_models["relationship_label"] = all_models.sample_id.map(lab.set_index("sample_id").relationship_label)
-    synp = all_models[(all_models.intensity > 0) & all_models.relationship_label.isin(["Conflict", "Override"])]
+    all_models["is_synthetic"] = all_models.sample_id.map(meta.is_synthetic)
+    synp = all_models[all_models.is_synthetic & all_models.relationship_label.isin(["Conflict", "Override"])]
     T["sens_intensity"] = synp.groupby(["model", "intensity"]).agg(n=("sample_id", "nunique"), **{c: (c, "mean") for c in _metric_cols(cfg)}).reset_index() if len(synp) else pd.DataFrame()
+    T["conflict_synthetic_by_intensity"] = _seed_agg(synp, ["intensity", "model"], cfg) if len(synp) else pd.DataFrame()
+    # per-history-length bucket (Hit@10, every model) and per-target-genre breakdown
+    natm = all_models[~all_models.is_synthetic].copy()
+    natm["history_bucket"] = history_bucket(natm.sample_id.map(meta.history_len), cfg)
+    T["history_buckets"] = _seed_agg(natm, ["history_bucket", "model"], cfg, cols=["Hit@10", "NDCG@10"])
+    genres = res.extra["ds"].movie_genres if "ds" in res.extra else {}
+    tg = natm.sample_id.map(meta.target).map(lambda t: genres.get(int(t), []))
+    top_genres = pd.Series([g for gl in tg[natm.model == PRIMARY] for g in gl]).value_counts().head(cfg.genre_breakdown_top).index.tolist()
+    exploded = natm.assign(target_genre=tg).explode("target_genre")
+    exploded = exploded[exploded.target_genre.isin(top_genres)]
+    T["genre_breakdown"] = _seed_agg(exploded, ["target_genre", "model"], cfg, cols=["Hit@10", "NDCG@10"]) if len(exploded) else pd.DataFrame()
+    # persistence: effect on seekers with >= persistence_min_sessions test sessions
+    T["persistence_sweep"] = _persistence_sweep_table(res)
+    T["persistence_effect"] = _persistence_effect(res)
     if "act_pred" in prim:
         T["action_by_relationship"] = pd.crosstab(prim.relationship_label, prim.act_pred.map(lambda i: ACTIONS[int(i)]), normalize="index").round(3).reset_index()
     T["alpha_sweep"] = res.alpha_sweep.groupby("alpha_ltp").mean(numeric_only=True).drop(columns="seed").reset_index() if len(res.alpha_sweep) else pd.DataFrame()
@@ -418,6 +523,183 @@ def build_tables(res: Results) -> None:
         res.extra["counterfactual_detail"] = cf
     T["case_studies"] = case_studies(res)
     T["error_analysis"] = error_analysis(res)
+    T["success_criteria"] = success_criteria(res)
+
+
+def history_bucket(history_len: pd.Series, cfg: Config) -> pd.Series:
+    """Map history length (items) to the configured named buckets."""
+    edges, labels = [-np.inf], []
+    for name, _lo, hi in cfg.history_buckets:
+        labels.append(str(name))
+        edges.append(np.inf if hi is None else float(hi))
+    return pd.cut(pd.Series(history_len).astype(float).values, edges, labels=labels, include_lowest=True)
+
+
+def _seed_agg(df: pd.DataFrame, by: list[str], cfg: Config, cols: list[str] | None = None) -> pd.DataFrame:
+    """Mean +- std over seeds of per-seed means, with n = distinct samples."""
+    cols = cols or _metric_cols(cfg)
+    if not len(df):
+        return pd.DataFrame()
+    seed_means = df.groupby(by + ["seed"], observed=True)[cols].mean().reset_index()
+    agg = seed_means.groupby(by, observed=True)[cols].agg(["mean", lambda s: s.std(ddof=0)])
+    agg.columns = [f"{c}_{'mean' if f == 'mean' else 'std'}" for c, f in agg.columns]
+    n = df.groupby(by, observed=True).sample_id.nunique().rename("n")
+    seeds = df.groupby(by, observed=True).seed.nunique().rename("seeds")
+    out = pd.concat([n, seeds, agg], axis=1).reset_index()
+    if "model" in by:
+        order = {m: i for i, m in enumerate(MODEL_ORDER)}
+        out["_o"] = out.model.map(order)
+        out = out.sort_values([c for c in by if c != "model"] + ["_o"]).drop(columns="_o").reset_index(drop=True)
+    return out
+
+
+def _persistence_sweep_table(res: Results) -> pd.DataFrame:
+    sw = res.extra.get("persistence_sweep")
+    if sw is None or not len(sw):
+        return pd.DataFrame()
+    num = [c for c in sw.columns if c not in ("split", "seed", "k")]
+    g = sw.groupby(["split", "k"])[num]
+    out = g.mean().add_suffix("_mean").join(g.std(ddof=0).add_suffix("_std")).reset_index()
+    out["seeds"] = sw.groupby(["split", "k"]).seed.nunique().values
+    out["hit10_multi_delta_mean"] = out.hit10_multi_with_mean - out.hit10_multi_without_mean
+    return out
+
+
+def _persistence_effect(res: Results) -> pd.DataFrame:
+    """AIPA (full) vs AIPA w/o persistence on natural test instances of seekers
+    with >= ``persistence_min_sessions`` sessions, and on the instances whose LTP
+    prior the tracker actually changed.  Paired within seed, pooled over seeds."""
+    cfg, ps, lab = res.cfg, res.per_sample, res.labels
+    ctrl = "AIPA w/o persistence"
+    if PRIMARY not in set(ps.model) or ctrl not in set(ps.model):
+        return pd.DataFrame()
+    n_sess = res.extra.get("test_sessions_per_seeker")
+    if n_sess is None:
+        return pd.DataFrame()
+    nat = ~lab.is_synthetic.values
+    multi = nat & (np.asarray(n_sess) >= cfg.persistence_min_sessions)
+    affected_by_seed = res.extra.get("persistence_affected", {})
+    affected_any = np.zeros(len(lab), bool)
+    for a in affected_by_seed.values():
+        affected_any |= np.asarray(a, bool)
+    shifts = res.persistence_shifts
+    n_shift = shifts[shifts.model == PRIMARY].groupby("seed").size() if len(shifts) else pd.Series(dtype=int)
+    rows = []
+    for subset, m in [("natural", nat), (f"seekers_with_ge{cfg.persistence_min_sessions}_sessions", multi), ("tracker_affected", affected_any)]:
+        row = {"subset": subset, "n": int(m.sum()), "n_seekers": int(lab.seeker_id[m].nunique()) if "seeker_id" in lab else np.nan,
+               "persistence_k": cfg.persistence_k, "n_shifts_mean": float(n_shift.mean()) if len(n_shift) else 0.0}
+        if m.sum() == 0:
+            rows.append({**row, "hit10_full": np.nan, "hit10_without": np.nan, "mean_diff": np.nan})
+            continue
+        agg = aggregate(ps, m, cfg).set_index("model")
+        sig = significance(ps, m, cfg, "Hit@10")
+        s = sig[sig.control == ctrl].iloc[0].to_dict() if len(sig) and (sig.control == ctrl).any() else {}
+        rows.append({**row, "hit10_full": float(agg.loc[PRIMARY, "Hit@10_mean"]), "hit10_without": float(agg.loc[ctrl, "Hit@10_mean"]),
+                     "mean_diff": s.get("mean_diff", np.nan), "t_p": s.get("t_p", np.nan), "wilcoxon_p": s.get("wilcoxon_p", np.nan),
+                     "perm_p": s.get("perm_p", np.nan), "n_pairs": s.get("n", 0)})
+    return pd.DataFrame(rows)
+
+
+def success_criteria(res: Results) -> pd.DataFrame:
+    """Automatic met / not met verdicts computed from the result tables."""
+    cfg, T = res.cfg, res.tables
+    alpha = cfg.criteria_alpha
+    rows: list[dict] = []
+
+    def add(cid, hypothesis, criterion, value, threshold, met, note=""):
+        rows.append({"id": cid, "hypothesis": hypothesis, "criterion": criterion, "value": value, "threshold": threshold,
+                     "met": "met" if met is True else ("not met" if met is False else "not evaluated"), "note": note})
+
+    sig = T.get("significance", pd.DataFrame())
+    baselines = set(BASELINE_NAMES)
+
+    def best_baseline(table):
+        if table is None or not len(table) or PRIMARY not in set(table.model):
+            return None, None, None
+        b = table[table.model.isin(baselines)]
+        if not len(b):
+            return None, None, None
+        best = b.sort_values("Hit@10_mean", ascending=False).iloc[0]
+        prim = table[table.model == PRIMARY].iloc[0]
+        return prim, best, float(prim["Hit@10_mean"] - best["Hit@10_mean"])
+
+    def sig_row(subset, control, metric="Hit@10"):
+        if not len(sig):
+            return None
+        d = sig[(sig.subset == subset) & (sig.control == control) & (sig.metric == metric)]
+        return d.iloc[0] if len(d) else None
+
+    # H1 overall
+    prim, best, diff = best_baseline(T.get("overall_natural"))
+    if prim is not None:
+        s = sig_row("natural", best.model)
+        p = float(s["perm_p_holm"]) if s is not None else np.nan
+        add("H1", "H1: AIPA (full) beats the best baseline on natural Hit@10", f"Hit@10 gain vs {best.model} > 0 and Holm perm p < {alpha}",
+            round(diff, 4), f"> 0, p < {alpha}", bool(diff > 0 and p < alpha), f"p_holm={p:.3g}, n={int(prim['n'])}")
+    else:
+        add("H1", "H1: overall", "Hit@10 gain vs best baseline", np.nan, "", None, "overall table missing")
+    # H2 natural conflict (strict and broad)
+    conf = T.get("conflict_natural", pd.DataFrame())
+    for subset in ["strict", "broad"]:
+        t = conf[conf.subset == subset] if len(conf) and "subset" in conf else pd.DataFrame()
+        prim, best, diff = best_baseline(t)
+        if prim is None:
+            add(f"H2-{subset}", f"H2: natural conflict ({subset})", "Hit@10 gain vs best baseline", np.nan, "", None, "subset too small (< 5) or missing")
+            continue
+        s = sig_row(f"conflict_natural_{subset}", best.model)
+        p = float(s["perm_p_holm"]) if s is not None else np.nan
+        add(f"H2-{subset}", f"H2: AIPA (full) beats the best baseline on natural conflict ({subset}) Hit@10",
+            f"gain vs {best.model} > 0 and Holm perm p < {alpha}", round(diff, 4), f"> 0, p < {alpha}", bool(diff > 0 and p < alpha),
+            f"p_holm={p:.3g}, n={int(prim['n'])}")
+    # H3 synthetic conflict
+    prim, best, diff = best_baseline(T.get("conflict_synthetic"))
+    if prim is not None:
+        s = sig_row("conflict_synthetic", best.model)
+        p = float(s["perm_p_holm"]) if s is not None else np.nan
+        add("H3", "H3: AIPA (full) beats the best baseline on synthetic conflict Hit@10", f"gain vs {best.model} > 0 and Holm perm p < {alpha}",
+            round(diff, 4), f"> 0, p < {alpha}", bool(diff > 0 and p < alpha), f"p_holm={p:.3g}, n={int(prim['n'])} (synthetic, reported separately)")
+    else:
+        add("H3", "H3: synthetic conflict", "Hit@10 gain vs best baseline", np.nan, "", None, "subset missing")
+    # relationship classification
+    relt = T.get("relationship", pd.DataFrame())
+    if len(relt) and (relt.model == PRIMARY).any():
+        r = relt[(relt.model == PRIMARY) & (relt.subset == "natural")]
+        mf1 = float(r.macro_f1.mean())
+        cf1 = float(r.F1_Conflict.mean()) if "F1_Conflict" in r else np.nan
+        add("REL-macroF1", "Relationship classifier (natural, weak-rule reference)", f"macro-F1 >= {cfg.criteria_macro_f1_min}",
+            round(mf1, 4), f">= {cfg.criteria_macro_f1_min}", bool(mf1 >= cfg.criteria_macro_f1_min), "reference labels are weak-rule labels, not human labels")
+        add("REL-ConflictF1", "Relationship classifier (natural, weak-rule reference)", f"Conflict-F1 >= {cfg.criteria_conflict_f1_min}",
+            round(cf1, 4), f">= {cfg.criteria_conflict_f1_min}", bool(cf1 >= cfg.criteria_conflict_f1_min) if not np.isnan(cf1) else None, "")
+    else:
+        add("REL-macroF1", "Relationship classifier", "macro-F1", np.nan, "", None, "relationship table missing")
+    # arbitration
+    arb = T.get("arbitration", pd.DataFrame())
+    if len(arb) and (arb.model == PRIMARY).any():
+        a = arb[(arb.model == PRIMARY) & (arb.subset == "natural")]
+        prec = float(a.clarification_precision.mean()) if "clarification_precision" in a else np.nan
+        unn = float(a.unnecessary_clarification_rate.mean()) if "unnecessary_clarification_rate" in a else np.nan
+        add("ARB-precision", "Arbitration: clarification precision (natural)", f">= {cfg.criteria_clarification_precision_min}", round(prec, 4),
+            f">= {cfg.criteria_clarification_precision_min}", bool(prec >= cfg.criteria_clarification_precision_min) if not np.isnan(prec) else None, "")
+        add("ARB-unnecessary", "Arbitration: unnecessary clarification rate (natural)", f"<= {cfg.criteria_unnecessary_clarification_max}", round(unn, 4),
+            f"<= {cfg.criteria_unnecessary_clarification_max}", bool(unn <= cfg.criteria_unnecessary_clarification_max) if not np.isnan(unn) else None, "")
+    # ablations: every ablation must be below AIPA (full) on natural Hit@10 (mean over seeds)
+    ov = T.get("overall_natural", pd.DataFrame())
+    if len(ov) and PRIMARY in set(ov.model):
+        full = float(ov.set_index("model").loc[PRIMARY, "Hit@10_mean"])
+        for abl in [m for m in MODEL_ORDER if m.startswith("AIPA w/o") and m in set(ov.model)]:
+            v = float(ov.set_index("model").loc[abl, "Hit@10_mean"])
+            s = sig_row("natural", abl)
+            p = float(s["perm_p_holm"]) if s is not None else np.nan
+            add(f"ABL-{abl.split('w/o ')[1]}", f"Ablation: removing {abl.split('w/o ')[1]} hurts natural Hit@10", f"AIPA (full) - {abl} > 0 and Holm perm p < {alpha}",
+                round(full - v, 4), f"> 0, p < {alpha}", bool(full - v > 0 and p < alpha), f"p_holm={p:.3g}")
+    pe = T.get("persistence_effect", pd.DataFrame())
+    if len(pe):
+        aff = pe[pe.subset == "tracker_affected"].iloc[0]
+        add("ABL-persistence-affected", "Persistence tracker changes Hit@10 on the instances it affected", f"n > 0, gain > 0 and perm p < {alpha}",
+            aff.mean_diff if not np.isnan(aff.mean_diff) else np.nan, f"n > 0, p < {alpha}",
+            bool(aff.n > 0 and aff.mean_diff > 0 and aff.get("perm_p", np.nan) < alpha) if aff.n > 0 else None,
+            f"n_affected={int(aff.n)}, shifts/seed={aff.n_shifts_mean:.1f}" + ("; tracker never fired" if aff.n == 0 else ""))
+    return pd.DataFrame(rows)
 
 
 # --------------------------------------------------------------------------
@@ -531,9 +813,16 @@ def save_results(res: Results) -> None:
     for k, v in res.tables.items():
         if isinstance(v, pd.DataFrame) and len(v):
             v.to_csv(out / f"table_{k}.csv", index=False)
+    sc = res.tables.get("success_criteria")
+    if isinstance(sc, pd.DataFrame) and len(sc):
+        sc.to_csv(out / "success_criteria.csv", index=False)
+    sw = res.extra.get("persistence_sweep")
+    if isinstance(sw, pd.DataFrame) and len(sw):
+        sw.to_csv(out / "persistence_sweep_raw.csv", index=False)
     meta = {
         "run_mode": res.cfg.run_mode, "config": res.cfg.to_dict(), "environment": environment_report(),
-        "status": res.status, "dataset_source": res.extra.get("dataset_source"), "file_hashes": res.extra.get("file_hashes"),
+        "status": res.status, "text_encoder": res.extra.get("text_encoder"),
+        "dataset_source": res.extra.get("dataset_source"), "file_hashes": res.extra.get("file_hashes"),
         "n_train": res.extra.get("n_train"), "n_valid": res.extra.get("n_valid"), "n_test": int(len(res.labels)),
         "runtime_s": res.extra.get("runtime_s"), "timestamp_utc": pd.Timestamp.utcnow().isoformat(),
     }

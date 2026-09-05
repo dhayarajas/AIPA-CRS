@@ -1,38 +1,38 @@
-| model                   |   seed | subset    |       ECE |      Brier |
-|:------------------------|-------:|:----------|----------:|-----------:|
-| AIPA (full)             |      7 | natural   | 0.0595188 | 0.0686274  |
-| AIPA (full)             |      7 | synthetic | 0.0691763 | 0.0133516  |
-| AIPA (full)             |      7 | all       | 0.0511186 | 0.0625195  |
-| AIPA (full)             |     42 | natural   | 0.0420801 | 0.0745662  |
-| AIPA (full)             |     42 | synthetic | 0.099195  | 0.0195408  |
-| AIPA (full)             |     42 | all       | 0.0419263 | 0.0682046  |
-| AIPA (rule policy)      |      7 | natural   | 0.0991186 | 0.0790332  |
-| AIPA (rule policy)      |      7 | synthetic | 0.0347983 | 0.00968774 |
-| AIPA (rule policy)      |      7 | all       | 0.0861658 | 0.0714924  |
-| AIPA (rule policy)      |     42 | natural   | 0.0563417 | 0.0662537  |
-| AIPA (rule policy)      |     42 | synthetic | 0.0510238 | 0.0239726  |
-| AIPA (rule policy)      |     42 | all       | 0.0461734 | 0.0611385  |
-| AIPA w/o clarification  |      7 | natural   | 0.0643861 | 0.0656839  |
-| AIPA w/o clarification  |      7 | synthetic | 0.0677801 | 0.013242   |
-| AIPA w/o clarification  |      7 | all       | 0.0506417 | 0.0598626  |
-| AIPA w/o clarification  |     42 | natural   | 0.0723906 | 0.0681032  |
-| AIPA w/o clarification  |     42 | synthetic | 0.0402263 | 0.0247284  |
-| AIPA w/o clarification  |     42 | all       | 0.0620537 | 0.0627538  |
-| AIPA w/o counterfactual |      7 | natural   | 0.0678222 | 0.068312   |
-| AIPA w/o counterfactual |      7 | synthetic | 0.0455309 | 0.0168837  |
-| AIPA w/o counterfactual |      7 | all       | 0.0566712 | 0.0625308  |
-| AIPA w/o counterfactual |     42 | natural   | 0.0323452 | 0.0677162  |
-| AIPA w/o counterfactual |     42 | synthetic | 0.0528865 | 0.0188074  |
-| AIPA w/o counterfactual |     42 | all       | 0.0256222 | 0.062148   |
-| AIPA w/o persistence    |      7 | natural   | 0.0607135 | 0.0687345  |
-| AIPA w/o persistence    |      7 | synthetic | 0.0691763 | 0.0133516  |
-| AIPA w/o persistence    |      7 | all       | 0.052189  | 0.0626155  |
-| AIPA w/o persistence    |     42 | natural   | 0.0351811 | 0.07478    |
-| AIPA w/o persistence    |     42 | synthetic | 0.099195  | 0.0195408  |
-| AIPA w/o persistence    |     42 | all       | 0.0357448 | 0.0683962  |
-| AIPA w/o relationship   |      7 | natural   | 0.0443645 | 0.0694444  |
-| AIPA w/o relationship   |      7 | synthetic | 0.101437  | 0.0187102  |
-| AIPA w/o relationship   |      7 | all       | 0.0450049 | 0.0634813  |
-| AIPA w/o relationship   |     42 | natural   | 0.031694  | 0.0674199  |
-| AIPA w/o relationship   |     42 | synthetic | 0.0505758 | 0.0184423  |
-| AIPA w/o relationship   |     42 | all       | 0.0271872 | 0.0618479  |
+| model                   |   seed | subset    |       ECE |     Brier |
+|:------------------------|-------:|:----------|----------:|----------:|
+| AIPA (full)             |      7 | natural   | 0.0565099 | 0.064934  |
+| AIPA (full)             |      7 | synthetic | 0.0647674 | 0.0157494 |
+| AIPA (full)             |      7 | all       | 0.0482651 | 0.0593223 |
+| AIPA (full)             |     42 | natural   | 0.0408842 | 0.0719801 |
+| AIPA (full)             |     42 | synthetic | 0.0939787 | 0.0184264 |
+| AIPA (full)             |     42 | all       | 0.042026  | 0.0657849 |
+| AIPA (rule policy)      |      7 | natural   | 0.081926  | 0.0756221 |
+| AIPA (rule policy)      |      7 | synthetic | 0.0522097 | 0.016133  |
+| AIPA (rule policy)      |      7 | all       | 0.0730197 | 0.0689317 |
+| AIPA (rule policy)      |     42 | natural   | 0.0610547 | 0.0656965 |
+| AIPA (rule policy)      |     42 | synthetic | 0.0465534 | 0.0268497 |
+| AIPA (rule policy)      |     42 | all       | 0.0506368 | 0.0607928 |
+| AIPA w/o clarification  |      7 | natural   | 0.051939  | 0.0650867 |
+| AIPA w/o clarification  |      7 | synthetic | 0.0607238 | 0.0144287 |
+| AIPA w/o clarification  |      7 | all       | 0.0423226 | 0.0593617 |
+| AIPA w/o clarification  |     42 | natural   | 0.0307266 | 0.0718111 |
+| AIPA w/o clarification  |     42 | synthetic | 0.0978865 | 0.0182626 |
+| AIPA w/o clarification  |     42 | all       | 0.0332708 | 0.0656227 |
+| AIPA w/o counterfactual |      7 | natural   | 0.0566711 | 0.0658478 |
+| AIPA w/o counterfactual |      7 | synthetic | 0.0527341 | 0.0138877 |
+| AIPA w/o counterfactual |      7 | all       | 0.0458863 | 0.0600349 |
+| AIPA w/o counterfactual |     42 | natural   | 0.0426212 | 0.0668771 |
+| AIPA w/o counterfactual |     42 | synthetic | 0.0491483 | 0.018012  |
+| AIPA w/o counterfactual |     42 | all       | 0.0363918 | 0.0613279 |
+| AIPA w/o persistence    |      7 | natural   | 0.050929  | 0.0657498 |
+| AIPA w/o persistence    |      7 | synthetic | 0.0647674 | 0.0157494 |
+| AIPA w/o persistence    |      7 | all       | 0.0405568 | 0.0600533 |
+| AIPA w/o persistence    |     42 | natural   | 0.0439421 | 0.0722251 |
+| AIPA w/o persistence    |     42 | synthetic | 0.0939787 | 0.0184264 |
+| AIPA w/o persistence    |     42 | all       | 0.0456005 | 0.0660045 |
+| AIPA w/o relationship   |      7 | natural   | 0.0515418 | 0.0653933 |
+| AIPA w/o relationship   |      7 | synthetic | 0.0541971 | 0.0132515 |
+| AIPA w/o relationship   |      7 | all       | 0.0413023 | 0.0595816 |
+| AIPA w/o relationship   |     42 | natural   | 0.0414726 | 0.0664094 |
+| AIPA w/o relationship   |     42 | synthetic | 0.0702641 | 0.0172512 |
+| AIPA w/o relationship   |     42 | all       | 0.0346974 | 0.0608346 |

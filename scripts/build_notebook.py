@@ -74,12 +74,12 @@ M("""
 The loader checks for local files, downloads ReDial (and MovieLens genres) if missing, validates sizes / hashes, caches the parsed corpus and reports source + version + hash. If the download is impossible the cell raises a clear error instead of silently substituting data.
 """)
 C("""
-from aipa.data import dataset_status, download_dataset, validate_dataset, load_dataset, dataset_statistics, per_seeker_frame, genre_frame, dialogue_frame, utterance_frame
+from aipa.data import dataset_status, download_dataset, needs_download, validate_dataset, load_dataset, dataset_statistics, per_seeker_frame, genre_frame, dialogue_frame, utterance_frame
 status = dataset_status(cfg); display(status)
-if not status.query("source == 'ReDial'").present.all():
+if needs_download(cfg):
     ok = download_dataset(cfg)
     if not ok:
-        raise RuntimeError("ReDial could not be downloaded; place redial_dataset.zip under data/raw/redial/ and re-run.")
+        raise RuntimeError("A dataset file could not be downloaded; see the messages above. Place redial_dataset.zip under data/raw/redial/ and/or movies.csv under data/external/ml-latest/, then re-run.")
 display(validate_dataset(cfg))
 ds = load_dataset(cfg)
 print("source:", ds.source)
@@ -173,6 +173,8 @@ M("""
 C("""
 def perf(d, metrics=("Hit@10", "NDCG@10", "MRR@10", "Hit@20", "NDCG@20")):
     out = pd.DataFrame({"model": d.model, "n": d.n})
+    if "subset" in d:
+        out.insert(0, "subset", d.subset.values)
     for m in metrics:
         out[m] = [f"{a:.3f} ± {s:.3f} [{lo:.3f}, {hi:.3f}]" for a, s, lo, hi in zip(d[f"{m}_mean"], d[f"{m}_std"], d[f"{m}_ci_low"], d[f"{m}_ci_high"])]
     return out
@@ -181,12 +183,23 @@ display(perf(T["overall_natural"]))
 sig = T["significance"]
 display(sig[(sig.subset == "natural") & (sig.metric == "Hit@10")].reset_index(drop=True))
 """)
-M("### 6.2 Conflict-sensitive evaluation")
+M("""### 6.2 Conflict-sensitive evaluation
+
+Two natural subsets are reported (`table_conflict_natural.csv`, column `subset`): **strict** = weak-rule label in `conflict_strict_labels`
+(Conflict/Override), and **broad** ("disagreement") = strict OR (weak-rule confidence >= `disagreement_conf_min` AND Jensen-Shannon
+divergence between the LTP and STI genre distributions >= `disagreement_js_min`). Both are derived from weak-rule labels, not human labels.
+Synthetic Conflict/Override instances stay separate and are additionally broken down by injection intensity (1/2/3). Paired tests form
+per-instance differences within each seed and pool them over seeds (paired t, Wilcoxon, sign-flip permutation; Holm-corrected; Cliff's delta).
+""")
 C("""
-print("Natural Conflict/Override (weak-rule labels; noisy):"); display(perf(T["conflict_natural"]))
-print("Natural non-conflict:"); display(perf(T["nonconflict_natural"]))
+print("Natural conflict subsets (weak-rule labels; noisy):"); display(T["conflict_subset_sizes"]); display(perf(T["conflict_natural"]))
+print("Natural non-disagreement:"); display(perf(T["nonconflict_natural"]))
 print("Controlled synthetic Conflict/Override (targets are sampled intent-matching items):"); display(perf(T["conflict_synthetic"]))
-display(sig[sig.subset.isin(["conflict_natural", "conflict_synthetic"]) & (sig.metric == "Hit@10")].reset_index(drop=True))
+display(T["conflict_synthetic_by_intensity"])
+display(sig[sig.subset.isin(["conflict_natural_strict", "conflict_natural_broad", "conflict_synthetic"]) & (sig.metric == "Hit@10")].reset_index(drop=True))
+print("Per-history-length bucket and per-target-genre Hit@10 (all models):"); display(T["history_buckets"]); display(T["genre_breakdown"])
+print("Persistence tracker effect / k sweep:"); display(T["persistence_effect"]); display(T["persistence_sweep"])
+print("Success criteria:"); display(T["success_criteria"])
 """)
 M("### 6.3 Relationship classification, arbitration, clarification and calibration")
 C("""

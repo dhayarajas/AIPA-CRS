@@ -31,6 +31,7 @@ import pandas as pd
 from . import ACTIONS, RELATIONSHIPS
 from .config import Config
 from .data import GENRE2ID, GENRES, ReDial
+from .evaluate import js_divergence
 from .preprocess import (
     OVERRIDE_LTP_MARKERS,
     OVERRIDE_STI_MARKERS,
@@ -311,6 +312,22 @@ def label_all(instances: list[Instance], cfg: Config, human: pd.DataFrame | None
     return out
 
 
+def disagreement_mask(lab: pd.DataFrame, cfg: Config) -> np.ndarray:
+    """Broad natural *disagreement* subset: weak-rule Conflict / Override, or a
+    confident weak-rule label (confidence >= ``disagreement_conf_min``) whose LTP
+    and STI genre distributions diverge (JS >= ``disagreement_js_min``)."""
+    nat = ~lab.is_synthetic.values
+    rel = lab.relationship_label.values
+    js = lab.js_divergence.values.astype(float)
+    strict = np.isin(rel, ["Conflict", "Override"])
+    diverge = (lab.confidence.values >= cfg.disagreement_conf_min) & (np.nan_to_num(js, nan=-1.0) >= cfg.disagreement_js_min)
+    return nat & (strict | diverge)
+
+
+def strict_conflict_mask(lab: pd.DataFrame, cfg: Config) -> np.ndarray:
+    return (~lab.is_synthetic.values) & np.isin(lab.relationship_label.values, list(cfg.conflict_strict_labels))
+
+
 def labels_frame(instances: list[Instance], labels: list[Label]) -> pd.DataFrame:
     rows = []
     for x, lab in zip(instances, labels):
@@ -327,6 +344,7 @@ def labels_frame(instances: list[Instance], labels: list[Label]) -> pd.DataFrame
                 "rationale": lab.rationale,
                 "is_synthetic": x.is_synthetic,
                 "intensity": x.injection.get("intensity", 0),
+                "js_divergence": js_divergence(x.ltp_genres, x.sti_genres),
                 "ltp_signal": "; ".join(f"{g}:{v:.2f}" for g, v in sorted(x.ltp_genres.items(), key=lambda kv: -kv[1])[:3]),
                 "sti_signal": "; ".join(f"{g}:{v:.2f}" for g, v in sorted(x.sti_genres.items(), key=lambda kv: -kv[1])[:3]),
                 "original_context": " | ".join(

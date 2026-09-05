@@ -17,9 +17,11 @@ import hashlib
 import json
 import pickle
 import re
+import ssl
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import urlopen
 
 import numpy as np
@@ -90,6 +92,27 @@ def _sha1(path: Path) -> str:
     return h.hexdigest()
 
 
+MOVIES_HEADER = "movieId,title,genres"
+
+
+def _movies_csv_ok(p: Path) -> bool:
+    if not p.exists() or p.stat().st_size <= 1_000_000:
+        return False
+    try:
+        with p.open(encoding="utf-8") as f:
+            if f.readline().rstrip("\r\n") != MOVIES_HEADER:
+                return False
+        with p.open("rb") as f:
+            f.seek(-4096, 2)
+            tail = f.read()
+    except (OSError, UnicodeError, ValueError):
+        return False
+    if not tail.endswith(b"\n"):
+        return False
+    last = tail.rstrip(b"\r\n").rsplit(b"\n", 1)[-1]
+    return len(list(csv.reader([last.decode("utf-8", "replace")]))[0]) == 3
+
+
 def dataset_status(cfg: Config) -> pd.DataFrame:
     rows = []
     root = cfg.path("dataset_path")
@@ -103,57 +126,103 @@ def dataset_status(cfg: Config) -> pd.DataFrame:
         p = ml / name
         rows.append({"source": "MovieLens", "file": name, "present": p.exists(),
                      "bytes": p.stat().st_size if p.exists() else 0, "expected_bytes": None,
-                     "size_ok": p.exists() and p.stat().st_size > 1_000_000})
+                     "size_ok": _movies_csv_ok(p)})
     return pd.DataFrame(rows)
+
+
+def _stream(url: str, dest: Path, context: ssl.SSLContext | None = None) -> None:
+    with urlopen(url, timeout=120, context=context) as r, dest.open("wb") as f:
+        while True:
+            chunk = r.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
 
 
 def _download(url: str, dest: Path) -> bool:
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with urlopen(url, timeout=120) as r, dest.open("wb") as f:
-            while True:
-                chunk = r.read(1 << 20)
-                if not chunk:
-                    break
-                f.write(chunk)
+        _stream(url, dest)
         return True
-    except Exception as exc:  # network failures are reported, never masked
+    except URLError as exc:
+        if not isinstance(exc.reason, ssl.SSLError):
+            print(f"Download of {url} failed: {exc!r}")
+            return False
+        print(f"TLS verification failed for {url} ({exc.reason}); retrying without certificate "
+              "verification. Check the system clock if this persists.")
+        try:
+            _stream(url, dest, ssl._create_unverified_context())
+            return True
+        except Exception as exc2:  # network failures are reported, never masked
+            print(f"Download of {url} failed: {exc2!r}")
+            return False
+    except Exception as exc:
         print(f"Download of {url} failed: {exc!r}")
         return False
 
 
 def download_dataset(cfg: Config, force: bool = False) -> bool:
-    """Fetch ReDial (required) and MovieLens genres (optional metadata)."""
+    """Fetch ReDial dialogues and MovieLens genre metadata (both required)."""
     status = dataset_status(cfg)
     ok = True
     root = cfg.path("dataset_path")
-    if force or not status.loc[status.source == "ReDial", "present"].all():
+    if force or not status.loc[status.source == "ReDial", "size_ok"].all():
         z = root / "redial_dataset.zip"
         if _download(REDIAL_URL, z):
             with zipfile.ZipFile(z) as zf:
                 zf.extractall(root)
         else:
             ok = False
-    if force or not status.loc[status.source == "MovieLens", "present"].all():
+    if force or not status.loc[status.source == "MovieLens", "size_ok"].all():
         z = cfg.path("external_path") / "ml-latest.zip"
         if _download(MOVIELENS_URL, z):
             with zipfile.ZipFile(z) as zf:
                 zf.extract("ml-latest/movies.csv", cfg.path("external_path"))
             z.unlink(missing_ok=True)
+            csv_path = cfg.path("external_path") / "ml-latest" / "movies.csv"
+            if not _movies_csv_ok(csv_path):
+                with csv_path.open(encoding="utf-8") as f:
+                    header = f.readline().strip()
+                csv_path.unlink()
+                print(f"Downloaded movies.csv is truncated or has an unexpected header {header!r}; discarded.")
+                ok = False
+            else:
+                print(f"movies.csv sha1={_sha1(csv_path)} (recorded in the report for reproducibility)")
         else:
-            print("MovieLens genres unavailable; items will have empty genre lists.")
+            ok = False
     return ok
 
 
 def validate_dataset(cfg: Config) -> pd.DataFrame:
     status = dataset_status(cfg)
     redial = status[status.source == "ReDial"]
-    if not redial["present"].all():
+    if not redial["size_ok"].all():
+        bad = redial[~redial.size_ok]
+        detail = ", ".join(
+            f"{r.file} ({'missing' if not r.present else f'{r.bytes} bytes, expected {r.expected_bytes}'})"
+            for r in bad.itertuples()
+        )
         raise DatasetUnavailable(
-            f"ReDial files missing under {cfg.path('dataset_path')}: "
-            f"{redial.loc[~redial.present, 'file'].tolist()}. Download from {REDIAL_URL}"
+            f"ReDial files missing or damaged under {cfg.path('dataset_path')}: {detail}. "
+            f"Re-download from {REDIAL_URL} (or run download_dataset)."
+        )
+    ml = status[status.source == "MovieLens"]
+    if not ml["size_ok"].all():
+        p = cfg.path("external_path") / "ml-latest" / "movies.csv"
+        state = ("missing" if not ml["present"].all()
+                 else f"truncated or not a MovieLens file ({p.stat().st_size} bytes, "
+                      f"expected header {MOVIES_HEADER!r})")
+        raise DatasetUnavailable(
+            f"MovieLens genre metadata {state}: expected a complete {p}. Genres drive the "
+            "LTP/STI signals and the relationship labels, so the pipeline refuses to run without "
+            f"them. Download {MOVIELENS_URL} and extract movies.csv to that path (or run "
+            "download_dataset); cached features are rebuilt automatically."
         )
     return status
+
+
+def needs_download(cfg: Config) -> bool:
+    return not dataset_status(cfg)["size_ok"].all()
 
 
 # ----------------------------------------------------------------------------
@@ -228,7 +297,12 @@ def load_dataset(cfg: Config, use_cache: bool = True, valid_fraction: float = 0.
     """Load ReDial, carve a validation split out of train (by dialogue), join genres, cache."""
     validate_dataset(cfg)
     root = cfg.path("dataset_path")
-    cache = cfg.path("interim_path") / "redial_parsed.pkl"
+    ml_csv = cfg.path("external_path") / "ml-latest" / "movies.csv"
+    hashes = {n: _sha1(root / n) for n in REDIAL_FILES}
+    hashes["movies.csv"] = _sha1(ml_csv)
+    split_key = {"file_hashes": hashes, "seed": cfg.seed, "valid_fraction": valid_fraction}
+    cache = cfg.path("interim_path") / (
+        f"redial_parsed_{hashlib.sha1(json.dumps(split_key, sort_keys=True).encode()).hexdigest()[:12]}.pkl")
     if use_cache and cache.exists():
         with cache.open("rb") as f:
             return pickle.load(f)
@@ -270,7 +344,7 @@ def load_dataset(cfg: Config, use_cache: bool = True, valid_fraction: float = 0.
         movie_genres=movie_genres,
         movie_year=movie_year,
         source=f"{REDIAL_URL} ; genres: {MOVIELENS_URL}",
-        file_hashes={n: _sha1(root / n) for n in REDIAL_FILES},
+        file_hashes=hashes,
     )
     cache.parent.mkdir(parents=True, exist_ok=True)
     with cache.open("wb") as f:

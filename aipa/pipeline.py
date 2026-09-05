@@ -11,16 +11,19 @@ import pandas as pd
 
 from .config import load_config
 from .data import (
+    DatasetUnavailable,
     dataset_statistics,
     dataset_status,
     download_dataset,
     genre_frame,
     load_dataset,
+    needs_download,
     per_seeker_frame,
     validate_dataset,
 )
 from .experiments import PRIMARY, Results, run_experiments
 from .figures import make_all
+from .models import BASELINE_NAMES
 from .report import build_report
 
 
@@ -49,10 +52,18 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     add("controlled synthetic injection", res.labels.is_synthetic.any(), f"{int(res.labels.is_synthetic.sum())} synthetic test instances")
     checks.append(("human-verified labels", "PASS" if res.status.get("human_verified_labels") == "RUN" else "NOT RUN", res.status.get("human_verified_labels", "")))
     models = set(res.per_sample.model)
-    for m in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware"]:
-        add(f"baseline: {m}", m in models, "")
+    disabled = set(res.cfg.values.get("disabled_models", []))
+
+    def add_model(label, m):
+        if m in disabled:
+            checks.append((label, "NOT RUN", "disabled in config"))
+        else:
+            add(label, m in models, "")
+
+    for m in BASELINE_NAMES:
+        add_model(f"baseline: {m}", m)
     for m in ["AIPA w/o relationship", "AIPA w/o counterfactual", "AIPA w/o clarification", "AIPA w/o persistence", "AIPA (rule policy)", PRIMARY]:
-        add(f"model: {m}", m in models, "")
+        add_model(f"model: {m}", m)
     add("relationship classifier metrics", len(T.get("relationship", [])) > 0, "")
     add("arbitration & clarification metrics", len(T.get("arbitration", [])) > 0, "")
     add("counterfactual driver diagnostic", len(res.counterfactual) > 0, "")
@@ -62,6 +73,14 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     add("multi-seed evaluation", res.per_sample.seed.nunique() >= 2, f"{res.per_sample.seed.nunique()} seed(s)" + ("" if res.per_sample.seed.nunique() >= 2 else " - increase `seeds` for std estimates"))
     add("conflict-sensitive evaluation", len(T.get("conflict_synthetic", [])) > 0 or len(T.get("conflict_natural", [])) > 0, "")
     add("sensitivity analyses", len(T.get("sens_history", [])) > 0 and len(T.get("sens_intensity", [])) > 0, "")
+    cn = T.get("conflict_natural", pd.DataFrame())
+    add("strict + broad natural conflict subsets", len(cn) > 0 and "subset" in cn and cn.subset.nunique() >= 2,
+        ", ".join(f"{r.subset}: n={r.n}" for r in T.get("conflict_subset_sizes", pd.DataFrame()).itertuples()) if len(T.get("conflict_subset_sizes", [])) else "")
+    add("history-bucket / genre breakdown", len(T.get("history_buckets", [])) > 0 and len(T.get("genre_breakdown", [])) > 0, "")
+    pe = T.get("persistence_effect", pd.DataFrame())
+    add("persistence effect on affected subset", len(pe) > 0,
+        f"n_affected={int(pe[pe.subset == 'tracker_affected'].n.iloc[0])}" if len(pe) else "")
+    add("success criteria table", len(T.get("success_criteria", [])) > 0, "")
     add("alpha sweep", len(T.get("alpha_sweep", [])) > 0, "")
     add("calibration analysis", len(T.get("calibration", [])) > 0, "")
     add("efficiency accounting", len(T.get("efficiency", [])) > 0, "")
@@ -74,14 +93,19 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     return pd.DataFrame(checks, columns=["component", "status", "note"])
 
 
-def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bool = True) -> tuple[Results, pd.DataFrame]:
+def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bool = True,
+            overrides: dict | None = None) -> tuple[Results, pd.DataFrame]:
     t0 = time.perf_counter()
-    cfg = load_config(run_mode)
+    cfg = load_config(run_mode, overrides=overrides)
     if clean_outputs:
         shutil.rmtree(cfg.path("output_path"), ignore_errors=True)
     print(dataset_status(cfg).to_string())
-    if not dataset_status(cfg).query("source == 'ReDial'").present.all():
-        download_dataset(cfg)
+    if needs_download(cfg) and not download_dataset(cfg):
+        raise DatasetUnavailable(
+            "A dataset file could not be downloaded; see the messages above. Place "
+            "redial_dataset.zip under data/raw/redial/ and/or movies.csv under "
+            "data/external/ml-latest/, then re-run."
+        )
     validate_dataset(cfg)
     ds = load_dataset(cfg)
     stats = dataset_statistics(ds)
@@ -102,6 +126,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-mode", default=None, choices=["quick", "full"])
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--embedding-model", default=None,
+                    help="override configs/default.yaml embedding_model (tfidf-svd or a sentence-transformers id)")
     a = ap.parse_args()
-    _, val = run_all(a.run_mode, verbose=not a.quiet)
+    _, val = run_all(a.run_mode, verbose=not a.quiet, overrides={"embedding_model": a.embedding_model})
     sys.exit(0 if (val.status != "FAIL").all() else 1)

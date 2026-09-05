@@ -35,7 +35,8 @@ class Config:
         return {"run_mode": self.run_mode, **self.values}
 
 
-def load_config(run_mode: str | None = None, path: Path | None = None) -> Config:
+def load_config(run_mode: str | None = None, path: Path | None = None, overrides: dict[str, Any] | None = None) -> Config:
+    """Merge ``common`` with the ``run_mode`` block; ``overrides`` (e.g. from the CLI) win over both."""
     path = path or PROJECT_ROOT / "configs" / "default.yaml"
     raw = yaml.safe_load(path.read_text())
     run_mode = run_mode or os.environ.get("AIPA_RUN_MODE", "quick")
@@ -43,6 +44,7 @@ def load_config(run_mode: str | None = None, path: Path | None = None) -> Config
         raise ValueError(f"Unknown RUN_MODE {run_mode!r}; expected one of {list(raw)}")
     values = dict(raw["common"])
     values.update(raw[run_mode])
+    values.update({k: v for k, v in (overrides or {}).items() if v is not None})
     if values.get("device", "auto") == "auto":
         values["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     return Config(values=values, run_mode=run_mode)
@@ -68,7 +70,8 @@ def environment_report() -> dict[str, str]:
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none",
         "cpu_count": str(os.cpu_count()),
     }
-    for pkg in ["numpy", "pandas", "scikit-learn", "scipy", "matplotlib", "seaborn", "pyyaml"]:
+    for pkg in ["numpy", "pandas", "scikit-learn", "scipy", "matplotlib", "seaborn", "pyyaml", "sentence-transformers",
+                "transformers"]:
         try:
             info[pkg] = md.version(pkg)
         except md.PackageNotFoundError:

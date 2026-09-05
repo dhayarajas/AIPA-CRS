@@ -34,6 +34,7 @@ jupyter nbconvert --to notebook --execute --inplace AIPA_CRS_Research_Implementa
 # option B: command line, identical pipeline
 python -m aipa.pipeline --run-mode quick     # ~15 min on 8 CPU cores, no GPU needed
 python -m aipa.pipeline --run-mode full      # all data, more epochs/seeds/bootstraps (hours on CPU)
+python -m aipa.pipeline --run-mode quick --embedding-model sentence-transformers/all-MiniLM-L6-v2   # quick mode with the pretrained encoder
 
 pytest -q                                    # unit tests
 ruff check .                                 # lint
@@ -43,8 +44,38 @@ The first run downloads ReDial (~33 MB zip from `github.com/ReDialData/website`)
 MovieLens `ml-latest` genre file (~350 MB zip, only `movies.csv` is kept) into `data/`.
 If your machine has no internet access, place `redial_dataset.zip` in `data/raw/redial/`
 and `movies.csv` in `data/external/ml-latest/` - the loader validates sizes and SHA-1 hashes
-and reports source/version in the report. Without MovieLens the pipeline still runs; genre
-coverage then drops and is reported as such.
+and reports source/version in the report. MovieLens genres are required: they drive the
+LTP/STI genre signals and the relationship labels, so the pipeline stops with a clear error
+when `movies.csv` is missing rather than silently producing an empty conflict subset. If the
+GroupLens TLS check fails (expired certificate or a wrong system clock) the download is retried
+without verification, the extracted file's header is checked and its SHA-1 is printed and
+recorded in the report so a run can be matched against the published GroupLens file. Parsed
+and processed caches are keyed by the SHA-1 of all four input files, so adding or replacing
+`movies.csv` rebuilds them automatically.
+
+### Text encoder (`embedding_model`)
+
+Profile sentences, dialogue context, the last seeker utterance and item titles are all mapped
+to vectors by `aipa/preprocess.py::TextEncoder`; two backends are available in
+`configs/default.yaml`:
+
+| `embedding_model` | dimension | notes |
+|---|---|---|
+| `tfidf-svd` | `text_dim` (64 quick / 128 full) | word/bigram TF-IDF + TruncatedSVD fitted on the *training* texts only; no download, default in `quick` mode |
+| `sentence-transformers/all-MiniLM-L6-v2` | 384 (taken from the model) | pretrained sentence encoder (`sentence-transformers`, ~90 MB from Hugging Face on first use); default in `full` mode |
+
+`text_dim` is ignored for pretrained models: the encoder reports its own dimension, and the
+LTP/STI encoders and the item tower project it to `hidden_dim` with a learned linear layer.
+Item titles are enriched with MovieLens genres before encoding (`"Title (year). Genres: Comedy, Romance"`,
+`item_text_genres: true`). Pretrained embeddings are computed on CPU in batches of
+`encoder_batch_size` (128) and cached in `data/interim/text_cache_<model>_<id-hash>.npz` keyed by the SHA-1 of
+the text, so repeated runs and seeds re-encode nothing (`text_cache: false` disables the cache).
+In quick mode the first MiniLM encode (~25k unique strings) takes about 30 s on 8 CPU cores and
+full mode roughly four times that; timing and cache statistics are printed and stored in
+`run_metadata.json` and the report.
+If the model cannot be loaded (offline machine) and `embedding_fallback: true`, the run falls
+back to `tfidf-svd` and the report states why; set `embedding_fallback: false` to fail instead.
+Either backend can be selected per run with `--embedding-model <name>`.
 
 ## Research design in one page
 
