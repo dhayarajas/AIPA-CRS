@@ -13,6 +13,10 @@
 
 \graphicspath{{../outputs/figures/}}
 \input{tables/macros}
+\newcommand{\nrm}{\operatorname{nrm}}
+\newcommand{\vh}{\mathbf{h}}
+\DeclareMathOperator{\sg}{sg}
+\DeclareMathOperator*{\argmax}{arg\,max}
 
 \begin{document}
 
@@ -61,20 +65,89 @@ We borrow the vocabulary of interventions \cite{pearl2009causality} for the driv
 
 \section{Problem Formulation}
 \label{sec:problem}
-Consider a seeker $u$ with a chronologically ordered set of past dialogues $\mathcal{H}_u = \{D_1, \dots, D_{m}\}$ and a current dialogue $D_{m+1}$. At turn $t$ of $D_{m+1}$ the recommender introduces a new movie $y_t$. Our prediction target is $y_t$, and the evidence available is:
-\begin{itemize}
-  \item \textbf{Long-term preference (LTP)}: the movies $u$ marked as liked or seen in $D_1,\dots,D_m$, the genre distribution over those movies, and short self-descriptive sentences (``I usually go for thrillers'') extracted from earlier dialogues;
-  \item \textbf{Short-term intent (STI)}: the seeker's utterances in $D_{m+1}$ strictly before turn $t$, the movies mentioned so far in the dialogue, a genre distribution induced from those utterances and mentions, and lexical flags (negation, explicit override markers such as ``for a change'', explicit habit markers such as ``as usual'').
-\end{itemize}
-Nothing from turn $t$ onward, and nothing from later dialogues, is visible to the model.
+This section fixes notation and states the prediction problem exactly as the released code constructs it. Table~\ref{tab:notation} collects the symbols. Vectors are bold lower case ($\vh$), matrices bold upper case ($\mathbf{W}$), sets calligraphic ($\mathcal{I}$), and $\mathbb{1}[\cdot]$ is the indicator function. For a vector $\mathbf{v}$ with non-negative entries we write $\nrm(\mathbf{v})=\mathbf{v}/\mathbf{1}^{\!\top}\mathbf{v}$ if $\mathbf{1}^{\!\top}\mathbf{v}>0$ and $\nrm(\mathbf{0})=\mathbf{0}$, so that genre vectors live in $\bar{\Delta}^{|\mathcal{G}|}=\Delta^{|\mathcal{G}|}\cup\{\mathbf{0}\}$, the probability simplex extended by the ``no evidence'' point.
 
-We define five \textbf{relationship} classes between LTP and STI. \emph{Consistent}: STI points where LTP already points. \emph{Complement}: STI adds a dimension that LTP does not cover but does not contradict it. \emph{Conflict}: STI opposes LTP with no signal that the user is aware of it. \emph{Override}: STI opposes LTP and the user explicitly flags a deliberate departure. \emph{Uncertain}: too little evidence on either side. The \textbf{action} space is $\{$Fuse, Prioritise\_LTP, Prioritise\_STI, Ask\_Clarification$\}$. A relationship implies a default action (consistent$\to$fuse, complement$\to$fuse, conflict$\to$prioritise STI, override$\to$prioritise STI, uncertain$\to$ask), but the learned policy is free to depart from it.
+\begin{table}[t]
+  \centering
+  \caption{Notation.}
+  \label{tab:notation}
+  \footnotesize
+  \begin{tabular}{@{}lp{0.60\columnwidth}@{}}
+    \toprule
+    Symbol & Meaning \\
+    \midrule
+    $\mathcal{I}$, $\mathcal{G}$ & item catalogue; genre set ($|\mathcal{G}|=19$) \\
+    $G(i)\subseteq\mathcal{G}$ & MovieLens genres of item $i$ (may be empty) \\
+    $u$, $c$, $t$ & seeker, dialogue (conversation id), turn index \\
+    $\mathcal{H}_u(c)$ & dialogues of $u$ strictly before $c$, Eq.~\eqref{eq:history} \\
+    $\mathbf{h}=(h_1,\dots,h_L)$ & liked/seen items from $\mathcal{H}_u(c)$, $L\le L_{\max}$ \\
+    $\mathcal{P}$ & profile sentences of $u$ from $\mathcal{H}_u(c)$ \\
+    $R_t$, $\ell_t$ & recent seeker text and last seeker utterance before $t$ \\
+    $\mathcal{M}_{<t}$, $\mathcal{M}^{+}_{<t}$ & movies mentioned / liked by the seeker before $t$ \\
+    $\boldsymbol{\pi}_{\mathrm{L}},\boldsymbol{\pi}_{\mathrm{S}}\in\bar{\Delta}^{|\mathcal{G}|}$ & LTP and STI genre vectors, Eqs.~\eqref{eq:piltp}, \eqref{eq:pisti} \\
+    $\mathbf{f}\in\mathbb{R}^{8}$ & lexical and length flags, Eq.~\eqref{eq:flags} \\
+    $\phi(\cdot)\in\mathbb{R}^{d_t}$ & text encoder, Eq.~\eqref{eq:text} \\
+    $\mathbf{e}_i$, $b_i$ & item vector and item bias, Eq.~\eqref{eq:item} \\
+    $\vh_{\mathrm{L}},\vh_{\mathrm{S}}\in\mathbb{R}^{d}$ & LTP and STI encodings \\
+    $\mathbf{s}_{\mathrm{L}},\mathbf{s}_{\mathrm{S}},\mathbf{s}\in\mathbb{R}^{|\mathcal{I}|}$ & component and fused score vectors \\
+    $\mathcal{R}$, $\mathcal{A}$ & relationship classes, actions ($|\mathcal{R}|=5$, $|\mathcal{A}|=4$) \\
+    $\mathbf{p}\in\Delta^{5}$, $\mathbf{q}\in\Delta^{4}$ & relationship posterior, action distribution \\
+    $\mathbf{W}_{\!A}\in\mathbb{R}^{4\times 2}$ & fixed action-to-weight table, Eq.~\eqref{eq:wa} \\
+    $\mathbf{c}\in\mathbb{R}^{5}$ & counterfactual features, Eq.~\eqref{eq:cffeat} \\
+    $\gamma,\theta,\tau,\rho,k,\eta$ & decay, rule threshold, driver threshold, dominance ratio, persistence count, persistence gain \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-We further distinguish a \textbf{temporary override}, which affects only the current session, from a \textbf{persistent shift}, in which the same departure recurs across $k$ or more distinct sessions and should be folded into LTP.
+\subsection{Seekers, sessions and the temporal boundary}
+ReDial is a set of dialogues, each a message sequence $D=(m_1,\dots,m_T)$ in which every message carries a role (seeker or recommender), English text and the set $M(m)\subseteq\mathcal{I}$ of movies it mentions. Every dialogue has a seeker identifier $u$ and an integer conversation identifier $c$, and the seeker annotates each mentioned movie as liked, seen and suggested. We write $\mathcal{L}(D)\subseteq\mathcal{I}$ for the movies the seeker marked as liked or seen in $D$.
+
+Conversation identifiers were assigned sequentially during collection, and we treat them as the chronological order of a seeker's sessions (an assumption; see Section~\ref{sec:discussion}). The history available at dialogue $c$ of seeker $u$ is then
+\begin{equation}
+  \label{eq:history}
+  \mathcal{H}_u(c)=\{D^{u}_{c'} : c'<c\},
+\end{equation}
+the set of $u$'s dialogues with a strictly smaller identifier. Nothing from $D^{u}_{c}$ itself or from any later dialogue enters the long-term side.
+
+\subsection{Instances}
+A recommendation instance is a triple $(c,t,y)$: at turn $t>1$ of dialogue $c$ the recommender's message mentions a movie $y\in\mathcal{I}$ that has not appeared earlier in the dialogue,
+\begin{equation}
+  \label{eq:target}
+  y\in M(m_t)\setminus\textstyle\bigcup_{t'<t} M(m_{t'}),\qquad \mathrm{role}(m_t)=\text{recommender}.
+\end{equation}
+A recommender message introducing several new movies yields one instance per movie. The prediction problem is to rank the full catalogue $\mathcal{I}$ so that $y$ is placed as high as possible, using only the two evidence bundles below.
+
+\paragraph{Long-term preference (LTP)}
+From $\mathcal{H}_u(c)$ in chronological order we take the liked/seen items, keep the most recent $L_{\max}=\maxHistory$ of them, and call the result $\mathbf{h}=(h_1,\dots,h_L)$ with $h_L$ the most recent. We also keep the last ten seeker utterances in $\mathcal{H}_u(c)$ that match a preference-statement pattern (``I usually like\ldots'', ``my favourite\ldots'') and are shorter than 200 characters; their concatenation is the profile text $\mathcal{P}$. The LTP genre vector is a recency-decayed mixture of the items' genre indicators,
+\begin{equation}
+  \label{eq:piltp}
+  \boldsymbol{\pi}_{\mathrm{L}}=\nrm\!\Big(\sum_{j=1}^{L}\gamma^{\,L-j}\,\frac{\mathbf{g}(h_j)}{|G(h_j)|}\Big),\qquad \mathbf{g}(i)_g=\mathbb{1}[g\in G(i)],
+\end{equation}
+with $\gamma=0.9$, so the most recent item has weight one and each older item is discounted by a further factor $\gamma$. Items with no MovieLens match ($G(i)=\emptyset$) contribute nothing. A seeker with $L<L_{\min}=\minHist$ history items is \emph{cold}.
+
+\paragraph{Short-term intent (STI)}
+Let $S_{<t}$ be the seeker messages before turn $t$, $R_t$ the concatenated text of the last $\maxContext$ of them, and $\ell_t$ the text of the last one. Let $\mathcal{M}_{<t}$ be the movies mentioned in $S_{<t}$ and $\mathcal{M}^{+}_{<t}\subseteq\mathcal{M}_{<t}$ those the seeker annotated as liked. Titles in the text are substituted by their surface form, so ``@12345'' becomes the movie name. The STI genre vector combines lexicon counts with the genres of liked in-dialogue movies,
+\begin{equation}
+  \label{eq:pisti}
+  \boldsymbol{\pi}_{\mathrm{S}}=\nrm\!\Big(\mathbf{n}(R_t)+\nrm\!\Big(\sum_{i\in\mathcal{M}^{+}_{<t}}\frac{\mathbf{g}(i)}{|G(i)|}\Big)\Big),
+\end{equation}
+where $\mathbf{n}(R_t)_g$ counts occurrences in $R_t$ of the keywords of a small English lexicon for genre $g$ (``scary'', ``slasher'', ``zombie'' for Horror, and so on). Eight scalar flags summarise lexical and length evidence,
+\begin{equation}
+  \label{eq:flags}
+  \mathbf{f}=\big(f_{\mathrm{sti}},\,f_{\mathrm{ltp}},\,f_{\mathrm{neg}},\,f_{\mathrm{req}},\,\tfrac{|S_{<t}|}{10},\,\tfrac{|\mathcal{M}_{<t}|}{5},\,f_{\mathrm{cold}},\,\tfrac{L}{L_{\max}}\big),
+\end{equation}
+where $f_{\mathrm{sti}}$ and $f_{\mathrm{ltp}}$ indicate an explicit departure marker (``for a change'', ``tonight'', ``with my kids'') or an explicit habit marker (``as usual'', ``stick with'') in $R_t$, $f_{\mathrm{neg}}$ indicates a negated genre keyword (``not into horror''), $f_{\mathrm{req}}$ indicates a request pattern in $\ell_t$, and $f_{\mathrm{cold}}=\mathbb{1}[L<L_{\min}]$.
+
+Everything on the STI side is computed from $S_{<t}$ only; everything on the LTP side from $\mathcal{H}_u(c)$ only. The model therefore sees neither the target turn nor any later data.
+
+\subsection{Relationships, actions and shifts}
+We distinguish five relationship classes $\mathcal{R}=\{$Complement, Consistent, Conflict, Override, Uncertain$\}$ between the two bundles. \emph{Consistent}: STI points where LTP already points. \emph{Complement}: STI adds a genre that LTP does not cover without contradicting it. \emph{Conflict}: STI opposes LTP with no sign that the user is aware of it. \emph{Override}: STI opposes LTP and the user flags the departure explicitly. \emph{Uncertain}: one side carries too little evidence. The action set is $\mathcal{A}=\{$Fuse, Prioritise\_LTP, Prioritise\_STI, Ask\_Clarification$\}$, and a fixed default map $A_0:\mathcal{R}\to\mathcal{A}$ sends Consistent and Complement to Fuse, Conflict and Override to Prioritise\_STI, and Uncertain to Ask\_Clarification. A learned policy may depart from $A_0$.
+
+A departure from habit that occurs in one session is a \emph{temporary override}. If the same departure wins arbitration in at least $k$ distinct sessions of the same seeker it is a \emph{persistent shift} and should be folded into LTP (Section~\ref{sec:persist}).
 
 \section{Method}
 \label{sec:method}
-Figure~\ref{fig:arch} shows the components. All encoders are small because the point of the study is the arbitration logic, not representational power; the same item tower, dimensionality and training recipe are used for every baseline so that differences are attributable to the arbitration design.
+Figure~\ref{fig:arch} shows the components. All encoders are small because the point of the study is the arbitration logic, not representational power; the item tower, the dimensionality $d=\hiddenDim$ and the training recipe are shared by every compared system so that differences are attributable to the arbitration design. Throughout, $\mathrm{MLP}(\mathbf{z})=\mathbf{W}_2\,\mathrm{GELU}(\mathbf{W}_1\mathbf{z}+\mathbf{b}_1)+\mathbf{b}_2$ with hidden width $d$ and dropout $0.1$ after the activation; each occurrence has its own parameters.
 
 \begin{figure}[t]
   \centering
@@ -83,27 +156,171 @@ Figure~\ref{fig:arch} shows the components. All encoders are small because the p
   \label{fig:arch}
 \end{figure}
 
-\subsection{Item and signal encoders}
-Each movie is represented by a learned embedding plus a projection of its content vector (TF--IDF over English title and genre text reduced with truncated SVD to \textDim{} dimensions, concatenated with a genre indicator from MovieLens \cite{harper2015movielens}). The \textbf{LTP encoder} pools the item embeddings of the seeker's history with exponentially decaying weights (older sessions count less), concatenates the LTP genre distribution and an encoding of profile sentences, and passes the result through a two-layer MLP. The \textbf{STI encoder} does the same with the encoded recent seeker text, the current-dialogue item mentions, the STI genre distribution and the lexical flags. Both encoders output a vector of dimension \hiddenDim.
-
-\subsection{Relationship classifier and arbitration policy}
-The relationship classifier takes $[h_{\text{LTP}}; h_{\text{STI}}; h_{\text{LTP}}\odot h_{\text{STI}}; |h_{\text{LTP}}-h_{\text{STI}}|]$ together with hand-crafted comparison features (cosine similarity of genre distributions, top-genre agreement, history length, cold-start flag, lexical flags) and outputs a distribution over the five relationships. The arbitration policy consumes the relationship distribution, the same comparison features and the counterfactual features described below, and outputs a distribution over the four actions. Fusion weights are computed as
+\subsection{Text and item representations}
+Text is encoded by a fixed (non-neural) map fitted on the training split: word uni- and bigram TF--IDF with sublinear term frequency, truncated SVD to $d_t=\textDim$ dimensions, and $\ell_2$ normalisation,
 \begin{equation}
-  w_{\text{LTP}} = \sum_a p(a)\, \beta_a, \qquad w_{\text{STI}} = 1 - w_{\text{LTP}},
+  \label{eq:text}
+  \phi(x)=\frac{\mathbf{V}^{\!\top}\mathrm{tfidf}(x)}{\lVert\mathbf{V}^{\!\top}\mathrm{tfidf}(x)\rVert_2+10^{-8}},\qquad \phi(\text{empty})=\mathbf{0}.
 \end{equation}
-where $\beta_a$ is a learned scalar per action initialised at $0.5$ for Fuse and Ask, $0.8$ for Prioritise\_LTP and $0.2$ for Prioritise\_STI. The final score is $s(i) = e_i^\top(w_{\text{LTP}} h_{\text{LTP}} + w_{\text{STI}} h_{\text{STI}}) + b_i$. A \emph{rule policy} variant replaces the learned action head by the default relationship$\to$action table; it is used as an ablation.
+Item $i$ has a content vector $\mathbf{x}_i=[\phi(\text{title}_i);\mathbf{g}(i)]\in\mathbb{R}^{d_t+|\mathcal{G}|}$ and the item tower produces
+\begin{equation}
+  \label{eq:item}
+  \mathbf{e}_i=\mathbf{E}_{i}+\mathbf{W}_{\!c}\mathbf{x}_i+\mathbf{b}_c,\qquad b_i\in\mathbb{R},
+\end{equation}
+with a free embedding table $\mathbf{E}\in\mathbb{R}^{|\mathcal{I}|\times d}$, a shared projection $\mathbf{W}_{\!c}$ and a free per-item bias $b_i$. Given any query vector $\vh\in\mathbb{R}^{d}$ the score of item $i$ is the biased inner product
+\begin{equation}
+  \label{eq:score}
+  s_i(\vh)=\vh^{\!\top}\mathbf{e}_i+b_i ,
+\end{equation}
+and $\mathbf{s}(\vh)\in\mathbb{R}^{|\mathcal{I}|}$ collects the scores of the whole catalogue (the padding index is masked to $-\infty$).
 
-\subsection{Clarification}
-When the chosen action is Ask\_Clarification and the model's confidence in that action exceeds a threshold, the system emits an English question generated from a small template set that names the top LTP genre and the top STI cue, for example \emph{``You usually go for dramas but you mentioned horror just now---should I stick with dramas tonight or try horror?''} Offline we cannot observe the user's answer, so we evaluate clarification by its precision (was the reference label indeed uncertain or conflicting?) and by an efficiency proxy (would the target have been reachable from the top-20 without asking?).
+\subsection{LTP encoder}
+\label{sec:ltp}
+The history $\mathbf{h}$ is right-aligned in a window of length $L_{\max}$ and each position $j$ receives a learned positional vector $\mathbf{u}_j$. The encoder pools the item vectors with a single learned attention query $\mathbf{a}\in\mathbb{R}^{d}$,
+\begin{align}
+  \tilde{\mathbf{e}}_j &= \mathbf{e}_{h_j}+\mathbf{u}_j, \qquad
+  \alpha_j = \frac{\exp(\mathbf{a}^{\!\top}\tilde{\mathbf{e}}_j)}{\sum_{j'=1}^{L}\exp(\mathbf{a}^{\!\top}\tilde{\mathbf{e}}_{j'})}, \label{eq:att}\\
+  \vh_{\mathrm{hist}} &= \sum_{j=1}^{L}\alpha_j\,\tilde{\mathbf{e}}_j , \label{eq:hist}
+\end{align}
+where the softmax runs over the non-padding positions only and $\vh_{\mathrm{hist}}=\mathbf{0}$ when $L=0$. The positional vectors let the attention prefer recent or old items, but the recency discount itself is applied to the genre vector through $\gamma$ in Eq.~\eqref{eq:piltp} rather than to the attention weights. The encoding is
+\begin{equation}
+  \label{eq:hltp}
+  \vh_{\mathrm{L}}=\mathbb{1}[\text{LTP evidence}]\cdot\mathrm{MLP}\big([\vh_{\mathrm{hist}};\,\mathbf{W}_{\!p}\phi(\mathcal{P});\,\mathbf{W}_{\!g}\boldsymbol{\pi}_{\mathrm{L}}]\big),
+\end{equation}
+where the indicator is one if at least one of $\mathbf{h}$, $\boldsymbol{\pi}_{\mathrm{L}}$ or $\phi(\mathcal{P})$ is non-zero. A seeker without any history thus has $\vh_{\mathrm{L}}=\mathbf{0}$ and, by Eq.~\eqref{eq:score}, an LTP score vector equal to the item biases.
+
+\subsection{STI encoder}
+The intent side has no sequence to attend over; it concatenates five projected views of the current dialogue, one of them a masked mean of the liked in-dialogue items (at most the last ten),
+\begin{align}
+  \bar{\mathbf{e}}_{\mathrm{cur}} &= \frac{1}{\max(1,|\mathcal{M}^{+}_{<t}|)}\sum_{i\in\mathcal{M}^{+}_{<t}}\mathbf{e}_i , \label{eq:cur}\\
+  \vh_{\mathrm{S}} &= \mathrm{MLP}\big([\mathbf{W}_{\!r}\phi(R_t);\,\mathbf{W}_{\!\ell}\phi(\ell_t);\,\mathbf{W}_{\!g}'\boldsymbol{\pi}_{\mathrm{S}};\,\mathbf{W}_{\!f}\mathbf{f};\,\bar{\mathbf{e}}_{\mathrm{cur}}]\big). \label{eq:hsti}
+\end{align}
+
+\subsection{Scoring and the fusion family}
+\label{sec:fusion}
+Both encodings are scored against the catalogue with Eq.~\eqref{eq:score}, $\mathbf{s}_{\mathrm{L}}=\mathbf{s}(\vh_{\mathrm{L}})$ and $\mathbf{s}_{\mathrm{S}}=\mathbf{s}(\vh_{\mathrm{S}})$, and every system in the study produces its final ranking from a convex combination
+\begin{equation}
+  \label{eq:fuse}
+  \mathbf{s}=w_{\mathrm{L}}\,\mathbf{s}_{\mathrm{L}}+w_{\mathrm{S}}\,\mathbf{s}_{\mathrm{S}},\qquad w_{\mathrm{L}}+w_{\mathrm{S}}=1,\; w_{\mathrm{L}},w_{\mathrm{S}}\ge 0 .
+\end{equation}
+Because the score is linear in the query, Eq.~\eqref{eq:fuse} equals $\mathbf{s}(w_{\mathrm{L}}\vh_{\mathrm{L}}+w_{\mathrm{S}}\vh_{\mathrm{S}})$: mixing scores and mixing encodings are the same operation, and the item bias enters exactly once. The systems differ only in how $(w_{\mathrm{L}},w_{\mathrm{S}})$ is chosen:
+\begin{equation}
+  \label{eq:family}
+  (w_{\mathrm{L}},w_{\mathrm{S}})=
+  \begin{cases}
+    (1,0) & \text{LTP-only},\\
+    (0,1) & \text{STI-only},\\
+    (\alpha,1-\alpha) & \text{naive fusion},\ \alpha=0.5,\\
+    (\sigma(z),1-\sigma(z)) & \text{adaptive fusion},\\
+    \mathbf{q}^{\!\top}\mathbf{W}_{\!A} & \text{AIPA}.
+  \end{cases}
+\end{equation}
+The naive weight is also swept over $\alpha\in\{0,0.25,0.5,0.75,1\}$ at test time (Table~\ref{tab:alpha}). Adaptive fusion learns a scalar gate
+\begin{equation}
+  \label{eq:gate}
+  z=\mathrm{MLP}\big([\vh_{\mathrm{L}};\vh_{\mathrm{S}};\boldsymbol{\pi}_{\mathrm{L}};\boldsymbol{\pi}_{\mathrm{S}};\mathbf{f}]\big)\in\mathbb{R},
+\end{equation}
+and has no notion of relationship or action. AIPA replaces the gate by a distribution $\mathbf{q}\in\Delta^{4}$ over actions (Section~\ref{sec:policy}) and a \emph{fixed} table that states what each action means for the weights,
+\begin{equation}
+  \label{eq:wa}
+  \mathbf{W}_{\!A}=
+  \begin{pmatrix}
+    0.50 & 0.50\\ 0.85 & 0.15\\ 0.15 & 0.85\\ 0.50 & 0.50
+  \end{pmatrix}
+  \begin{array}{l}\text{Fuse}\\ \text{Prioritise\_LTP}\\ \text{Prioritise\_STI}\\ \text{Ask\_Clarification}\end{array}
+\end{equation}
+so that $w_{\mathrm{L}}=\sum_{a}q_a[\mathbf{W}_{\!A}]_{a1}$. Because each row of $\mathbf{W}_{\!A}$ sums to one the constraint in Eq.~\eqref{eq:fuse} holds automatically. The table is not learned: what the policy learns is $\mathbf{q}$, and the weights are an interpretable consequence of it. A clarifying turn still ranks the catalogue with equal weights, so an offline ranking metric is defined for every instance.
+
+\subsection{Relationship classifier}
+\label{sec:rel}
+The classifier sees both encodings, their element-wise interactions, the raw genre vectors and flags, and the cosine of the encodings,
+\begin{align}
+  \boldsymbol{\varphi}_{\mathrm{rel}} &= \big[\vh_{\mathrm{L}};\,\vh_{\mathrm{S}};\,\vh_{\mathrm{L}}\odot\vh_{\mathrm{S}};\,|\vh_{\mathrm{L}}-\vh_{\mathrm{S}}|;\,\boldsymbol{\pi}_{\mathrm{L}};\,\boldsymbol{\pi}_{\mathrm{S}};\,\mathbf{f};\,\cos(\vh_{\mathrm{L}},\vh_{\mathrm{S}})\big], \label{eq:relfeat}\\
+  \mathbf{r} &= \mathrm{MLP}(\boldsymbol{\varphi}_{\mathrm{rel}})\in\mathbb{R}^{5},\qquad \mathbf{p}=\mathrm{softmax}(\mathbf{r}), \label{eq:relpost}
+\end{align}
+with $\cos(\mathbf{x},\mathbf{y})=\mathbf{x}^{\!\top}\mathbf{y}/\max(\lVert\mathbf{x}\rVert\lVert\mathbf{y}\rVert,10^{-6})$. The posterior $\mathbf{p}$ is passed to the policy through a stop-gradient, so the action loss cannot reshape the relationship head; the relationship head is trained only by its own (weak) labels.
 
 \subsection{Counterfactual driver diagnostic}
-After training, for each test turn we re-score the candidates three times: normally, with $h_{\text{LTP}}$ zeroed, and with $h_{\text{STI}}$ zeroed. Let $\delta_{\text{LTP}}$ and $\delta_{\text{STI}}$ be the fractions of the original top-$K$ list that change when the respective signal is removed. The turn is labelled \emph{Neither-driven} if both are below $\tau=\cfTau$; \emph{STI-driven} if $\delta_{\text{STI}}\ge\tau$ and $\delta_{\text{STI}}\ge\cfDom\,\delta_{\text{LTP}}$; \emph{LTP-driven} symmetrically; and \emph{Jointly-driven} otherwise. The two $\delta$ values also enter the policy as features, so the model can learn to prefer clarification when both signals are pulling the list in different directions. Again, these are statements about the model's sensitivity, not about the user.
+\label{sec:cf}
+The diagnostic asks how much a ranking depends on each pathway, and answers by intervening on the model rather than on the data. The reference ranking is the naive fusion of the two component scores, and removing a pathway is defined as scoring with the other pathway alone,
+\begin{equation}
+  \label{eq:naive}
+  \mathbf{s}_{\varnothing}=\tfrac{1}{2}(\mathbf{s}_{\mathrm{L}}+\mathbf{s}_{\mathrm{S}}),\quad
+  \mathbf{s}_{\varnothing}\big|_{do(\mathrm{L}=\varnothing)}:=\mathbf{s}_{\mathrm{S}},\quad
+  \mathbf{s}_{\varnothing}\big|_{do(\mathrm{S}=\varnothing)}:=\mathbf{s}_{\mathrm{L}} .
+\end{equation}
+This is a convention rather than a literal $\vh_{\mathrm{L}}\leftarrow\mathbf{0}$ (which would give $\tfrac12\vh_{\mathrm{S}}^{\!\top}\mathbf{e}_i+b_i$ and weigh the item bias twice as heavily); it keeps the interventional list equal to what the STI or LTP tower would recommend on its own. Disruption is one minus the Jaccard overlap of the factual and interventional top-$K$ lists ($K=10$),
+\begin{align}
+  J_K(\mathbf{s},\mathbf{s}') &= \frac{|\mathrm{Top}_K(\mathbf{s})\cap\mathrm{Top}_K(\mathbf{s}')|}{|\mathrm{Top}_K(\mathbf{s})\cup\mathrm{Top}_K(\mathbf{s}')|}, \label{eq:jaccard}\\
+  \delta_{\mathrm{L}} &= 1-J_K(\mathbf{s}_{\varnothing},\mathbf{s}_{\mathrm{S}}),\qquad
+  \delta_{\mathrm{S}} = 1-J_K(\mathbf{s}_{\varnothing},\mathbf{s}_{\mathrm{L}}), \label{eq:delta}
+\end{align}
+so $\delta_{\mathrm{L}}$ measures how much the list moves when LTP is removed and $\delta_{\mathrm{S}}$ when STI is removed. Together with the top-1 margins $m(\mathbf{s})=s_{(1)}-s_{(2)}$ of the three score vectors they form the feature vector handed to the policy,
+\begin{equation}
+  \label{eq:cffeat}
+  \mathbf{c}=\big(\delta_{\mathrm{L}},\,\delta_{\mathrm{S}},\,m(\mathbf{s}_{\varnothing}),\,m(\mathbf{s}_{\mathrm{S}}),\,m(\mathbf{s}_{\mathrm{L}})\big)\in\mathbb{R}^{5},
+\end{equation}
+computed without gradient. The per-turn driver label uses a threshold $\tau=\cfTau$ and a dominance ratio $\rho=\cfDom$:
+\begin{equation}
+  \label{eq:driver}
+  \mathrm{driver}=
+  \begin{cases}
+    \text{Neither} & \delta_{\mathrm{L}}<\tau \ \wedge\ \delta_{\mathrm{S}}<\tau,\\
+    \text{STI} & \delta_{\mathrm{S}}\ge\tau \ \wedge\ \delta_{\mathrm{S}}\ge\rho\,\delta_{\mathrm{L}},\\
+    \text{LTP} & \delta_{\mathrm{L}}\ge\tau \ \wedge\ \delta_{\mathrm{L}}\ge\rho\,\delta_{\mathrm{S}},\\
+    \text{Jointly} & \text{otherwise},
+  \end{cases}
+\end{equation}
+with the cases tested in the order written. The labels describe the sensitivity of the fitted model; nothing here identifies an effect on users. A second, post-training probe re-scores the \emph{fused} model of Eq.~\eqref{eq:fuse} under $\vh_{\mathrm{L}}\leftarrow\mathbf{0}$ and $\vh_{\mathrm{S}}\leftarrow\mathbf{0}$ (which also changes $\mathbf{p}$, $\mathbf{q}$ and hence the weights) and reports rank and NDCG changes and the plain overlap $|\mathrm{Top}_{10}\cap\mathrm{Top}_{10}'|/10$; that is the quantity in Table~\ref{tab:cf}.
 
-\subsection{Temporary versus persistent shifts}
-The persistence tracker records, per seeker, the genre that won arbitration whenever the predicted action was Prioritise\_STI. If the same genre wins in at least $k=\persistK$ distinct sessions, later instances of that seeker receive an LTP genre vector shifted toward it, and the event is logged. Shifts that do not recur remain session-local. In the offline setting this is evaluated by counting detected shifts and by checking that the full model and the model with the tracker disabled differ only on affected seekers.
+\subsection{Arbitration policy and clarification trigger}
+\label{sec:policy}
+\paragraph{Learned policy}
+The action logits are a function of the encodings, the evidence, the (detached) relationship posterior and the counterfactual features,
+\begin{align}
+  \boldsymbol{\varphi}_{\mathrm{act}} &= \big[\vh_{\mathrm{L}};\,\vh_{\mathrm{S}};\,\boldsymbol{\pi}_{\mathrm{L}};\,\boldsymbol{\pi}_{\mathrm{S}};\,\mathbf{f};\,\cos(\vh_{\mathrm{L}},\vh_{\mathrm{S}});\,\mathrm{sg}(\mathbf{p});\,\mathbf{c}\big], \label{eq:actfeat}\\
+  \mathbf{o} &= \mathrm{MLP}(\boldsymbol{\varphi}_{\mathrm{act}})\in\mathbb{R}^{4},\qquad \mathbf{q}=\mathrm{softmax}(\mathbf{o}), \label{eq:actpost}
+\end{align}
+where $\mathrm{sg}$ is the stop-gradient. The ablations remove $\mathrm{sg}(\mathbf{p})$ or $\mathbf{c}$ from Eq.~\eqref{eq:actfeat}; the ``without clarification'' ablation sets $o_{\mathrm{Ask}}=-\infty$ before the softmax. The weights follow from Eq.~\eqref{eq:wa} and the emitted action is $\hat{a}=\arg\max_a q_a$.
 
-\subsection{Training}
-The recommendation loss is a sampled softmax over the item catalogue. When labels are available, a cross-entropy term on the relationship head (weight $\lambda_{\text{rel}}=0.5$) and one on the action head ($\lambda_{\text{act}}=0.3$) are added, each weighted per instance by the label confidence so that low-confidence weak labels contribute less. We train with AdamW \cite{loshchilov2019adamw}, learning rate \lr, batch size \batchSize, gradient clipping at 1.0, and early stopping on validation Hit@10 with a patience of three epochs. For the ``without clarification'' ablation, Ask\_Clarification targets are remapped to Fuse during training as well as masked at inference, so the ablation is not merely a decoding constraint.
+\paragraph{Rule policy}
+The rule variant replaces Eq.~\eqref{eq:actpost} by a deterministic function of the relationship posterior and two evidence tests. With $\hat{r}=\arg\max_r p_r$, confidence $\kappa=\max_r p_r$, threshold $\theta=0.5$, $\mathrm{cold}=\mathbb{1}[f_{\mathrm{cold}}>\tfrac12]$ and $\mathrm{noSTI}=\mathbb{1}[\boldsymbol{\pi}_{\mathrm{S}}=\mathbf{0}]$,
+\begin{equation}
+  \label{eq:rule}
+  \hat{a}=
+  \begin{cases}
+    \text{Prioritise\_STI} & \mathrm{cold}\ \wedge\ \neg\mathrm{noSTI},\\
+    \text{Ask\_Clarification} & \kappa<\theta,\\
+    A_0(\hat{r}) & \text{otherwise},
+  \end{cases}
+\end{equation}
+where the first case takes precedence. When clarification is disabled the second case is dropped, any Ask\_Clarification produced by $A_0$ becomes Fuse, and a non-cold seeker with $\mathrm{noSTI}$ is sent to Prioritise\_LTP. The rule output is turned into logits $\mathbf{o}=20\cdot\mathbf{1}_{\hat{a}}$, so its softmax is a near one-hot $\mathbf{q}$ and Eq.~\eqref{eq:wa} returns the weight row of $\hat{a}$ almost exactly.
+
+\paragraph{Clarification}
+A clarifying question is emitted whenever $\hat{a}=\text{Ask\_Clarification}$: for the learned policy this is the arg-max of Eq.~\eqref{eq:actpost}, for the rule policy the second case of Eq.~\eqref{eq:rule}. The question is filled from a small English template set using the arg-max genres of $\boldsymbol{\pi}_{\mathrm{L}}$ and $\boldsymbol{\pi}_{\mathrm{S}}$, for example \emph{``Earlier you enjoyed drama movies, but right now you seem interested in horror. Should I focus on horror for tonight, or find something that fits both?''} Offline we cannot observe the answer, so the question is evaluated by whether the reference label called for it (Section~\ref{sec:metrics}).
+
+\subsection{Persistence tracker}
+\label{sec:persist}
+At inference the natural test instances are visited in order of (seeker, conversation id, turn). For each seeker $u$ and genre $g$ the tracker keeps the set $\mathcal{C}_{u,g}$ of sessions in which the first instance of the session was resolved by Prioritise\_STI with $g$ the arg-max of $\boldsymbol{\pi}_{\mathrm{S}}$,
+\begin{equation}
+  \label{eq:persist-count}
+  \mathcal{C}_{u,g}\leftarrow\mathcal{C}_{u,g}\cup\{c\}\quad\text{if}\ \hat{a}=\text{Prioritise\_STI}\ \wedge\ g=\arg\max_{g'}\pi_{\mathrm{S},g'} .
+\end{equation}
+Before an instance of seeker $u$ is scored, its LTP genre vector is replaced by
+\begin{equation}
+  \label{eq:persist-adjust}
+  \boldsymbol{\pi}'_{\mathrm{L}}=\nrm\!\Big(\boldsymbol{\pi}_{\mathrm{L}}+\eta\sum_{g:\,|\mathcal{C}_{u,g}|\ge k}\mathbf{1}_{g}\Big),
+\end{equation}
+with $k=\persistK$ and $\eta=0.3$, where $\mathbf{1}_g$ is the unit vector of genre $g$; only sessions already visited count, so the adjustment never uses the future. Each time $|\mathcal{C}_{u,g}|$ first reaches $k$ a persistent shift $(u,g,c)$ is logged. The model is then re-run with $\boldsymbol{\pi}'_{\mathrm{L}}$ in place of $\boldsymbol{\pi}_{\mathrm{L}}$; the encoders and the policy are unchanged, so the tracker acts only through Eqs.~\eqref{eq:hltp}, \eqref{eq:relfeat}, \eqref{eq:gate} and \eqref{eq:actfeat}. Synthetic instances are excluded from the tracker.
+
+\subsection{Training objective}
+\label{sec:train}
+Every instance $n$ carries a target $y_n$ and, for AIPA variants, a relationship label $r_n\in\mathcal{R}$, an action label $a_n\in\mathcal{A}$ and a confidence $\omega_n\in[0,1]$ from the labelling procedure of Section~\ref{sec:data} ($\omega_n=1$ for synthetic instances). With $\mathrm{CE}(\mathbf{z},y)=-\log\mathrm{softmax}(\mathbf{z})_y$ the mini-batch loss is
+{\small\begin{equation}
+  \label{eq:loss}
+  \mathcal{L}=\frac{1}{B}\sum_{n=1}^{B}\Big[\mathrm{CE}(\mathbf{s}_n,y_n)+\omega_n\big(\lambda_{\mathrm{rel}}\,\mathrm{CE}(\mathbf{r}_n,r_n)+\lambda_{\mathrm{act}}\,\mathrm{CE}(\mathbf{o}_n,a_n)\big)\Big],
+\end{equation}}
+with $\lambda_{\mathrm{rel}}=0.5$ and $\lambda_{\mathrm{act}}=0.3$. The recommendation term is a full softmax over the catalogue, not a sampled one. The two auxiliary terms are present only for AIPA variants, the action term only when the policy is learned, and each is scaled per instance by the label confidence so that a low-confidence weak label moves the heads less than a confident one. For the ``without clarification'' ablation the action label Ask\_Clarification is remapped to Fuse in Eq.~\eqref{eq:loss} as well as being masked in Eq.~\eqref{eq:actpost}, so the ablation is not merely a decoding constraint. All models are trained with AdamW \cite{loshchilov2019adamw} (learning rate \lr, weight decay $10^{-5}$), batch size \batchSize, gradient-norm clipping at $5$, for at most \nEpochs{} epochs with early stopping on validation Hit@10 (patience three) and restoration of the best epoch. Baselines that are not fusion models (GRU, conversation-aware) use the same item tower, Eq.~\eqref{eq:score} and the first term of Eq.~\eqref{eq:loss}.
 
 \section{Data and Labels}
 \label{sec:data}
@@ -122,7 +339,24 @@ Each recommendation instance is one (dialogue, turn, target movie) triple where 
 \subsection{Relationship labels}
 ReDial has no relationship annotations. We use two label sources and keep them apart throughout.
 
-\textbf{Weak-rule labels.} A deterministic procedure assigns a relationship, an action and a confidence from the LTP and STI genre distributions and from lexical evidence: explicit habit markers yield \emph{Consistent}; negation of a habitual genre or a known tension pair (e.g.\ comedy vs.\ horror) with low genre similarity yields \emph{Conflict}, or \emph{Override} when an explicit departure marker is present; a new genre dimension with otherwise compatible distributions yields \emph{Complement}; absence of genre evidence yields \emph{Uncertain}. These labels are noisy, and the confidence attached to each is used to down-weight it in training and to define the ``high-confidence'' evaluation subsets.
+\textbf{Weak-rule labels.} A deterministic function of $(\boldsymbol{\pi}_{\mathrm{L}},\boldsymbol{\pi}_{\mathrm{S}},R_t,\mathbf{f})$ assigns a relationship $r_n$, an action $a_n$ and a confidence $\omega_n$. Let $\mathrm{sim}=\cos(\boldsymbol{\pi}_{\mathrm{L}},\boldsymbol{\pi}_{\mathrm{S}})$, let $T(\boldsymbol{\pi})$ be the (at most two) largest genres of $\boldsymbol{\pi}$ with mass at least $0.15$, and let $\mathrm{hasL}=\mathbb{1}[\boldsymbol{\pi}_{\mathrm{L}}\neq\mathbf{0}\wedge\neg f_{\mathrm{cold}}]$. Three lexical tests read $R_t$: a habit marker ($f_{\mathrm{ltp}}$), a departure marker ($f_{\mathrm{sti}}$), and $\mathrm{negH}=\mathbb{1}[\exists g\ \text{negated in}\ R_t:\ \pi_{\mathrm{L},g}\ge0.2]$. Two structural tests compare the genre vectors: $\mathrm{tens}=\mathbb{1}[\exists s\in T(\boldsymbol{\pi}_{\mathrm{S}}),\,g\in T(\boldsymbol{\pi}_{\mathrm{L}}):\{s,g\}\in\mathcal{T}\wedge\pi_{\mathrm{L},s}<0.1]$ for a fixed list $\mathcal{T}$ of genre pairs that rarely co-occur in a request (Horror--Children, Comedy--War, \ldots), and $\mathrm{new}=\mathbb{1}[\exists s\in T(\boldsymbol{\pi}_{\mathrm{S}}):\pi_{\mathrm{L},s}<0.05]$. Writing $\mathrm{C/O}$ for Override if $f_{\mathrm{sti}}=1$ and Conflict otherwise, the rule is evaluated top to bottom:
+{\small\begin{equation}
+  \label{eq:weakrule}
+  (r_n,a_n,\omega_n)=
+  \begin{cases}
+    (\text{Uncertain},\ \text{Ask},\ 0.9) & \boldsymbol{\pi}_{\mathrm{S}}=\mathbf{0}\ \wedge\ \neg\mathrm{hasL},\\
+    (\text{Uncertain},\ \text{Ask},\ 0.6) & \boldsymbol{\pi}_{\mathrm{S}}=\mathbf{0},\\
+    (\text{Uncertain},\ \text{Prio.\_STI},\ 0.6) & \neg\mathrm{hasL},\\
+    (\text{Consistent},\ \text{Fuse},\ 0.8) & f_{\mathrm{ltp}}=1,\\
+    (\mathrm{C/O},\ \text{Prio.\_STI},\ 0.8) & \mathrm{negH},\\
+    (\mathrm{C/O},\ \text{Prio.\_STI},\ \omega_{\mathrm{t}}) & \mathrm{tens}\wedge\mathrm{sim}<0.25,\\
+    (\text{Consistent},\ \text{Fuse},\ \omega_{\mathrm{s}}) & \mathrm{sim}\ge0.5,\\
+    (\text{Complement},\ \text{Fuse},\ \omega_{\mathrm{n}}) & \mathrm{new},\\
+    (\text{Consistent},\ \text{Fuse},\ 0.5) & \mathrm{sim}\ge0.25,\\
+    (\text{Uncertain},\ \text{Ask},\ 0.5) & \text{otherwise},
+  \end{cases}
+\end{equation}}
+with $\omega_{\mathrm{s}}=0.5+0.5\,\mathrm{sim}$, $\omega_{\mathrm{n}}=0.5+0.3(1-\mathrm{sim})$, $\omega_{\mathrm{t}}=0.75$ if $f_{\mathrm{sti}}=1$ and $\omega_{\mathrm{t}}=0.55+0.2\,(0.25-\mathrm{sim})/0.25$ otherwise. The action label follows $A_0$ except in the third case, where a cold seeker with a stated intent is labelled Prioritise\_STI rather than Ask. These labels are noisy by construction; $\omega_n$ down-weights them in Eq.~\eqref{eq:loss} and defines the ``necessary clarification'' event in Eq.~\eqref{eq:necessary}.
 
 \textbf{Synthetic controlled labels.} For \injRate{} of natural test instances whose seeker has a usable LTP, we append one English seeker utterance requesting a genre that conflicts with, overrides, or agrees with the seeker's top habitual genre, at one of three intensities (from a mild ``maybe'' to an insistent request), and replace the target by a movie of the requested genre. Each synthetic instance records its source instance, the injected utterance, the intended relationship and the intensity, and carries an explicit synthetic flag. Synthetic instances appear in the training set as well (with the same flag) so that the relationship head sees clean examples of the rarer classes.
 
@@ -142,7 +376,66 @@ Table~\ref{tab:labels} gives the resulting distribution. \emph{Override} is rare
 \emph{LTP-only} and \emph{STI-only} score items from one encoder. \emph{Naive fusion} averages the two encodings with $\alpha=0.5$; \emph{Adaptive fusion} learns a scalar gate from the two encodings but has no relationship or action head. \emph{Sequential (GRU)} runs a GRU \cite{hidasi2016gru4rec} over the concatenation of history items and current-dialogue mentions. \emph{Conversation-aware} attends over the current dialogue with the history vector as query. The latter two are our own re-implementations in the same parameter budget; they are not reproductions of any published system and should not be read as such. The AIPA ablations remove the relationship head, the counterfactual features, clarification, or the persistence tracker, or swap the learned policy for the rule table.
 
 \subsection{Metrics and statistics}
-Ranking quality is measured by Hit@$K$ (equal to Recall@$K$ with one target per instance), NDCG@$K$ and MRR@$K$ at $K\in\{10,20\}$ over the full catalogue. Relationship classification is reported as accuracy, macro-F1, weighted-F1 and per-class F1; arbitration by action accuracy against the weak-rule action, conflict-resolution accuracy, override success (target in top-10 when STI is prioritised on a conflict), clarification precision, unnecessary-clarification rate and wrong-override rate. Calibration of the relationship head is measured by expected calibration error and Brier score \cite{guo2017calibration}. Every metric is averaged over \nSeeds{} seeds; 95\% intervals are percentile bootstraps with \nBoot{} resamples over test instances; pairwise comparisons use paired $t$ and Wilcoxon tests with Holm correction \cite{holm1979simple} within each family, and we report Cohen's $d$ and Cliff's $\delta$ \cite{cliff1993dominance}. All natural-data and synthetic-data results are reported separately.
+\label{sec:metrics}
+\paragraph{Ranking}
+For an instance with target $y$ and fused scores $\mathbf{s}$ the rank of the target is the number of catalogue items strictly ahead of it plus one, and the three ranking metrics are functions of that rank alone,
+\begin{align}
+  r &= 1+\big|\{i\in\mathcal{I}: s_i>s_y\}\big|, \label{eq:rank}\\
+  \mathrm{Hit@}K &= \mathbb{1}[r\le K],\qquad
+  \mathrm{NDCG@}K = \frac{\mathbb{1}[r\le K]}{\log_2(r+1)},\nonumber\\
+  \mathrm{MRR@}K &= \frac{\mathbb{1}[r\le K]}{r}, \label{eq:rankmetrics}
+\end{align}
+for $K\in\{10,20\}$. With one target per instance Hit@$K$ coincides with Recall@$K$. Reported values are means over test instances and over the \nSeeds{} seeds.
+
+\paragraph{Relationship classification}
+With $\hat{r}_n=\arg\max_r p_{n,r}$ we report accuracy, per-class F1 and
+\begin{equation}
+  \label{eq:macrof1}
+  \text{macro-F1}=\frac{1}{|\mathcal{R}|}\sum_{r\in\mathcal{R}}\mathrm{F1}_r,\qquad
+  \text{weighted-F1}=\sum_{r\in\mathcal{R}}\frac{N_r}{N}\,\mathrm{F1}_r,
+\end{equation}
+where $\mathrm{F1}_r$ is set to zero for a class that is never predicted and never occurs. Calibration uses the confidence $\kappa_n=\max_r p_{n,r}$ and ten equal-width bins $B_b=\{n:\kappa_n\in((b-1)/10,\,b/10]\}$,
+\begin{align}
+  \mathrm{ECE} &= \sum_{b=1}^{10}\frac{|B_b|}{N}\,\Big|\frac{1}{|B_b|}\sum_{n\in B_b}\mathbb{1}[\hat{r}_n=r_n]-\frac{1}{|B_b|}\sum_{n\in B_b}\kappa_n\Big|, \label{eq:ece}\\
+  \mathrm{Brier} &= \frac{1}{|\mathcal{R}^{+}|}\sum_{r\in\mathcal{R}^{+}}\frac{1}{N}\sum_{n=1}^{N}\big(p_{n,r}-\mathbb{1}[r_n=r]\big)^2, \label{eq:brier}
+\end{align}
+where empty bins are skipped and $\mathcal{R}^{+}$ is the set of classes that occur at least once in the evaluated subset (one-versus-rest Brier score averaged over those classes) \cite{guo2017calibration}.
+
+\paragraph{Arbitration and clarification}
+Let $\hat{a}_n$ be the emitted action, $a_n$ the reference action, and define the per-instance events
+\begin{align}
+  \mathrm{asked}_n &= \mathbb{1}[\hat{a}_n=\text{Ask\_Clarification}], \nonumber\\
+  \mathrm{conf}_n &= \mathbb{1}[r_n\in\{\text{Conflict},\text{Override}\}], \nonumber\\
+  \mathrm{nec}_n &= \mathbb{1}[r_n=\text{Uncertain}]\ \vee\ \big(\mathrm{conf}_n\wedge\omega_n<\theta_{\mathrm{c}}\big), \label{eq:necessary}
+\end{align}
+with $\theta_{\mathrm{c}}=0.6$: a question is deemed necessary when the reference relationship is Uncertain or when it is a conflict that the labelling rule itself was not confident about. Then
+\begin{align}
+  \text{clar.\ rate} &= \tfrac{1}{N}\textstyle\sum_n\mathrm{asked}_n, \nonumber\\
+  \text{clar.\ precision} &= \frac{\sum_n\mathrm{asked}_n\,\mathrm{nec}_n}{\sum_n\mathrm{asked}_n}, \nonumber\\
+  \text{clar.\ efficiency} &= \frac{\sum_n\mathrm{asked}_n\,\mathrm{nec}_n}{\sum_n\mathrm{nec}_n}, \nonumber\\
+  \text{unnecessary rate} &= \tfrac{1}{N}\textstyle\sum_n\mathrm{asked}_n(1-\mathrm{nec}_n), \label{eq:clar}
+\end{align}
+and the wrong-override rate is $\tfrac{1}{N}\sum_n\mathbb{1}[\hat{a}_n=\text{Prioritise\_STI}\wedge r_n=\text{Consistent}]$. Arbitration accuracy is $\tfrac{1}{N}\sum_n\mathbb{1}[\hat{a}_n=a_n]$; conflict-resolution accuracy is the same quantity restricted to $\mathrm{conf}_n=1$; override success is the mean Hit@10 over instances with $r_n=\text{Override}$ and $\hat{a}_n=\text{Prioritise\_STI}$. Precision is undefined when no question is asked.
+
+\paragraph{Uncertainty and paired comparisons}
+Each metric $x_n$ is first averaged over seeds for every test instance $n$. A 95\% interval for a mean is the percentile bootstrap over instances with $B=\nBoot$ resamples,
+\begin{equation}
+  \label{eq:boot}
+  \bar{x}^{(b)}=\frac{1}{N}\sum_{n=1}^{N}x_{\xi^{(b)}_n},\quad \xi^{(b)}_n\overset{\text{iid}}{\sim}\mathrm{Unif}\{1,\dots,N\},
+\end{equation}
+and the interval is $[\bar{x}^{(\cdot)}_{2.5\%},\,\bar{x}^{(\cdot)}_{97.5\%}]$, the empirical percentiles of the resampled means, with a fixed resampling seed. AIPA (full) is compared with every other system on the same instances through the paired differences $d_n=x_n^{\mathrm{AIPA}}-x_n^{\mathrm{other}}$ using the paired $t$-test and the Wilcoxon signed-rank test (zero differences split between the signs). The $m$ $p$-values of one family (one metric, one subset) are adjusted by the Holm step-down procedure \cite{holm1979simple}: with $p_{(1)}\le\dots\le p_{(m)}$,
+\begin{equation}
+  \label{eq:holm}
+  \tilde{p}_{(j)}=\max_{l\le j}\ \min\big(1,\,(m-l+1)\,p_{(l)}\big).
+\end{equation}
+Effect sizes are Cohen's $d$ on the paired differences and Cliff's $\delta$ \cite{cliff1993dominance} over all instance pairs,
+\begin{equation}
+  \label{eq:effects}
+  d=\frac{\bar{d}}{s_d},\qquad
+  \delta=\frac{1}{N^2}\sum_{i,j=1}^{N}\big(\mathbb{1}[x_i>x'_j]-\mathbb{1}[x_i<x'_j]\big),
+\end{equation}
+where $s_d$ is the sample standard deviation of the $d_n$, $x=x^{\mathrm{AIPA}}$ and $x'=x^{\mathrm{other}}$, and
+for $N>2000$ the sum over $j$ runs over the first $2000$ control instances. A comparison whose differences are identically zero (e.g.\ an ablation that changed no prediction) is reported as undefined rather than as $p=1$. All natural-data and synthetic-data results are reported separately.
 
 \subsection{Compute}
 Everything runs on CPU (\cpuCount{} cores; PyTorch \torchVersion, Python \pythonVersion). The configuration used here (``quick'' mode) trains for at most \nEpochs{} epochs with hidden size \hiddenDim; the released configuration also defines a ``full'' mode with the complete corpus, more seeds and more bootstrap resamples, which we have not run and for which we make no claims.
