@@ -7,21 +7,33 @@ Run after `python -m aipa.pipeline` so the manuscript never carries hand-typed n
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from aipa.experiments import MODEL_ORDER  # noqa: E402
+from aipa.models import BASELINE_NAMES  # noqa: E402
+
 RES = ROOT / "outputs" / "results"
 OUT = ROOT / "paper" / "tables"
 OUT.mkdir(parents=True, exist_ok=True)
 
-MODEL_ORDER = [
-    "LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware",
-    "AIPA w/o relationship", "AIPA w/o counterfactual", "AIPA w/o clarification", "AIPA w/o persistence",
-    "AIPA (rule policy)", "AIPA (full)",
-]
-BASELINES = MODEL_ORDER[:6]
+BASELINES = BASELINE_NAMES
+
+
+def present(frame: pd.DataFrame, models=MODEL_ORDER) -> pd.DataFrame:
+    """Rows of `frame` (indexed by model) in canonical order, skipping models absent from this run."""
+    return frame.loc[[m for m in models if m in frame.index]]
+
+
+def last_baseline(names) -> str | None:
+    """Name of the last baseline present in `names`; the baseline/ablation separator goes after it."""
+    found = [m for m in BASELINES if m in set(names)]
+    return found[-1] if found else None
 
 
 _ESC = {
@@ -44,8 +56,8 @@ def write(name: str, body: str) -> None:
 
 
 def ranking_table(csv: str, name: str, models=MODEL_ORDER, ci: bool = True) -> None:
-    d = pd.read_csv(RES / csv).set_index("model").loc[models]
-    rows = []
+    d = present(pd.read_csv(RES / csv).set_index("model"), models)
+    rows, sep = [], last_baseline(d.index)
     for m, r in d.iterrows():
         hit = f"{r['Hit@10_mean']:.3f}"
         if ci:
@@ -54,7 +66,7 @@ def ranking_table(csv: str, name: str, models=MODEL_ORDER, ci: bool = True) -> N
         if m == "AIPA (full)":
             cells = [f"\\textbf{{{c}}}" for c in cells]
         rows.append(" & ".join(cells) + " \\\\")
-        if m == BASELINES[-1]:
+        if m == sep:
             rows.append("\\midrule")
     head = "Model & Hit@10" + (" [95\\% CI]" if ci else "") + " & NDCG@10 & MRR@10 & Hit@20 & NDCG@20 \\\\"
     write(name, "\\begin{tabular}{lccccc}\n\\toprule\n" + head + "\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
@@ -69,8 +81,8 @@ ranking_table("table_overall_synthetic.csv", "overall_synthetic", ci=False)
 sig = pd.read_csv(RES / "table_significance.csv").query("treatment == 'AIPA (full)' and metric == 'Hit@10'")
 SIG_SUBSETS = ["natural", "conflict_natural", "conflict_synthetic"]
 sig_n = {s: int(sig.loc[sig.subset == s, "n"].iloc[0]) for s in SIG_SUBSETS}
-rows = []
-for m in MODEL_ORDER[:-1]:
+rows, sep = [], last_baseline(sig.control)
+for m in [x for x in MODEL_ORDER[:-1] if x in set(sig.control)]:
     cells = [tex(m)]
     for sub in SIG_SUBSETS:
         r = sig[(sig.control == m) & (sig.subset == sub)]
@@ -81,7 +93,7 @@ for m in MODEL_ORDER[:-1]:
             p = r["t_p_holm"]
             cells += [f"{r['mean_diff']:+.3f}", (f"{p:.3f}" if p >= 0.001 else "$<$0.001") + ("$^{*}$" if p < 0.05 else ""), f"{r['cohen_d']:+.2f}"]
     rows.append(" & ".join(cells) + " \\\\")
-    if m == BASELINES[-1]:
+    if m == sep:
         rows.append("\\midrule")
 write("significance", "\\begin{tabular}{l ccc ccc ccc}\n\\toprule\n& \\multicolumn{3}{c}{Natural (all, $n$=" + str(sig_n["natural"]) + ")} & \\multicolumn{3}{c}{Natural conflict ($n$=" + str(sig_n["conflict_natural"]) + ")} & \\multicolumn{3}{c}{Synthetic conflict ($n$=" + str(sig_n["conflict_synthetic"]) + ")} \\\\\n\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}\nControl & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ & $\\Delta$ & $p_{\\text{Holm}}$ & $d$ \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
@@ -118,7 +130,7 @@ for _, r in cf.iterrows():
 write("counterfactual", "\\begin{tabular}{llr cc cc cccc}\n\\toprule\n& & & \\multicolumn{2}{c}{$|\\Delta$NDCG@10$|$} & \\multicolumn{2}{c}{Top-10 overlap} & \\multicolumn{4}{c}{Driver (\\%)} \\\\\n\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-11}\nSource & Relationship & $n$ & no LTP & no STI & no LTP & no STI & STI & LTP & Joint & Neither \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
 # efficiency
-eff = pd.read_csv(RES / "table_efficiency.csv").set_index("model").loc[MODEL_ORDER]
+eff = present(pd.read_csv(RES / "table_efficiency.csv").set_index("model"))
 rows = [" & ".join([tex(m), f"{int(r['n_parameters']):,}", f"{r['model_size_mb']:.2f}", f"{r['train_time_s']:.1f}", f"{r['cpu_inference_ms_per_sample']:.3f}"]) + " \\\\" for m, r in eff.iterrows()]
 write("efficiency", "\\begin{tabular}{lrrrr}\n\\toprule\nModel & Parameters & Size (MB) & Train (s) & CPU inf.\\ (ms/sample) \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
 
