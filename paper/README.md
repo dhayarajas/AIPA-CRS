@@ -1,6 +1,6 @@
 # Manuscript
 
-IEEE journal-format (`IEEEtran`, `journal` option) write-up of the AIPA-CRS study.
+IEEE journal-format (`IEEEtran`, `journal` option) write-up of the AIPA-CRS work.
 
 - `main.tex` — the manuscript; figures are read directly from `../outputs/figures/`.
 - `refs.bib` — bibliography.
