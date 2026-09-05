@@ -145,19 +145,28 @@ def download_dataset(cfg: Config, force: bool = False) -> bool:
     status = dataset_status(cfg)
     ok = True
     root = cfg.path("dataset_path")
-    if force or not status.loc[status.source == "ReDial", "present"].all():
+    if force or not status.loc[status.source == "ReDial", "size_ok"].all():
         z = root / "redial_dataset.zip"
         if _download(REDIAL_URL, z):
             with zipfile.ZipFile(z) as zf:
                 zf.extractall(root)
         else:
             ok = False
-    if force or not status.loc[status.source == "MovieLens", "present"].all():
+    if force or not status.loc[status.source == "MovieLens", "size_ok"].all():
         z = cfg.path("external_path") / "ml-latest.zip"
         if _download(MOVIELENS_URL, z):
             with zipfile.ZipFile(z) as zf:
                 zf.extract("ml-latest/movies.csv", cfg.path("external_path"))
             z.unlink(missing_ok=True)
+            csv_path = cfg.path("external_path") / "ml-latest" / "movies.csv"
+            with csv_path.open(encoding="utf-8") as f:
+                header = f.readline().strip()
+            if header != "movieId,title,genres":
+                csv_path.unlink()
+                print(f"Downloaded movies.csv has an unexpected header {header!r}; discarded.")
+                ok = False
+            else:
+                print(f"movies.csv sha1={_sha1(csv_path)} (recorded in the report for reproducibility)")
         else:
             ok = False
     return ok
@@ -172,14 +181,20 @@ def validate_dataset(cfg: Config) -> pd.DataFrame:
             f"{redial.loc[~redial.present, 'file'].tolist()}. Download from {REDIAL_URL}"
         )
     ml = status[status.source == "MovieLens"]
-    if not ml["present"].all():
+    if not ml["size_ok"].all():
+        p = cfg.path("external_path") / "ml-latest" / "movies.csv"
+        state = "missing" if not ml["present"].all() else f"truncated ({p.stat().st_size} bytes)"
         raise DatasetUnavailable(
-            "MovieLens genre metadata missing: expected "
-            f"{cfg.path('external_path') / 'ml-latest' / 'movies.csv'}. Genres drive the LTP/STI signals and "
-            "the relationship labels, so the pipeline refuses to run without them. Download "
-            f"{MOVIELENS_URL}, extract movies.csv to that path, then delete data/interim and data/processed."
+            f"MovieLens genre metadata {state}: expected a complete {p}. Genres drive the "
+            "LTP/STI signals and the relationship labels, so the pipeline refuses to run without "
+            f"them. Download {MOVIELENS_URL} and extract movies.csv to that path (or run "
+            "download_dataset); cached features are rebuilt automatically."
         )
     return status
+
+
+def needs_download(cfg: Config) -> bool:
+    return not dataset_status(cfg)["size_ok"].all()
 
 
 # ----------------------------------------------------------------------------
@@ -254,7 +269,10 @@ def load_dataset(cfg: Config, use_cache: bool = True, valid_fraction: float = 0.
     """Load ReDial, carve a validation split out of train (by dialogue), join genres, cache."""
     validate_dataset(cfg)
     root = cfg.path("dataset_path")
-    cache = cfg.path("interim_path") / "redial_parsed.pkl"
+    ml_csv = cfg.path("external_path") / "ml-latest" / "movies.csv"
+    hashes = {n: _sha1(root / n) for n in REDIAL_FILES}
+    hashes["movies.csv"] = _sha1(ml_csv)
+    cache = cfg.path("interim_path") / f"redial_parsed_{hashlib.sha1(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:12]}.pkl"
     if use_cache and cache.exists():
         with cache.open("rb") as f:
             return pickle.load(f)
@@ -296,7 +314,7 @@ def load_dataset(cfg: Config, use_cache: bool = True, valid_fraction: float = 0.
         movie_genres=movie_genres,
         movie_year=movie_year,
         source=f"{REDIAL_URL} ; genres: {MOVIELENS_URL}",
-        file_hashes={n: _sha1(root / n) for n in REDIAL_FILES},
+        file_hashes=hashes,
     )
     cache.parent.mkdir(parents=True, exist_ok=True)
     with cache.open("wb") as f:

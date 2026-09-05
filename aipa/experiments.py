@@ -4,6 +4,7 @@ under ``outputs/results`` as CSV / JSON so that figures, tables and the report
 are generated from files, never from values typed by hand."""
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -75,7 +76,8 @@ class Results:
 
 def prepare(cfg: Config, verbose: bool = True):
     ds = load_dataset(cfg)
-    name = f"instances_{cfg.run_mode}_s{cfg.seed}_f{cfg.subset_fraction}"
+    data_tag = hashlib.sha1(json.dumps(ds.file_hashes, sort_keys=True).encode()).hexdigest()[:12]
+    name = f"instances_{cfg.run_mode}_s{cfg.seed}_f{cfg.subset_fraction}_{data_tag}"
     inst = load_instances(cfg, name)
     if inst is None:
         inst = build_instances(ds, cfg)
