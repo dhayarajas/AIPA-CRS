@@ -249,6 +249,14 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
       f"* This run used run mode `{cfg.run_mode}`" + (" on a data subset with few epochs; results are indicative only and the `full` mode should be run before any publication claim.\n" if cfg.run_mode == "quick" else ".\n"))
     A("## 15. Reproducibility\n")
     A(_md_table(pd.DataFrame({"key": list(env), "value": list(env.values())})))
+    te = res.extra.get("text_encoder") or {}
+    if te:
+        A(f"Text encoder: `{te.get('name')}` ({te.get('dim')}-d"
+          + (", pretrained sentence-transformers" if te.get("pretrained") else ", TF-IDF + SVD fitted on the training split")
+          + f"); encoding time {te.get('encode_seconds')} s, {te.get('n_newly_encoded')} strings newly encoded, "
+          f"{te.get('n_cache_hits')} served from the on-disk cache."
+          + (f" Requested `{te.get('requested')}` but fell back: {te.get('fallback_reason')}." if te.get("fallback_reason") else "")
+          + "\n")
     A("Configuration (`configs/default.yaml`, effective values):\n")
     A(_md_table(pd.DataFrame({"key": list(cfg.to_dict()), "value": [str(v) for v in cfg.to_dict().values()]}), max_rows=200))
     A("Dataset file hashes (SHA-1):\n")
