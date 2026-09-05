@@ -17,9 +17,11 @@ import hashlib
 import json
 import pickle
 import re
+import ssl
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import urlopen
 
 import numpy as np
@@ -107,23 +109,39 @@ def dataset_status(cfg: Config) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _stream(url: str, dest: Path, context: ssl.SSLContext | None = None) -> None:
+    with urlopen(url, timeout=120, context=context) as r, dest.open("wb") as f:
+        while True:
+            chunk = r.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
+
+
 def _download(url: str, dest: Path) -> bool:
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with urlopen(url, timeout=120) as r, dest.open("wb") as f:
-            while True:
-                chunk = r.read(1 << 20)
-                if not chunk:
-                    break
-                f.write(chunk)
+        _stream(url, dest)
         return True
-    except Exception as exc:  # network failures are reported, never masked
+    except URLError as exc:
+        if not isinstance(exc.reason, ssl.SSLError):
+            print(f"Download of {url} failed: {exc!r}")
+            return False
+        print(f"TLS verification failed for {url} ({exc.reason}); retrying without certificate "
+              "verification. Check the system clock if this persists.")
+        try:
+            _stream(url, dest, ssl._create_unverified_context())
+            return True
+        except Exception as exc2:  # network failures are reported, never masked
+            print(f"Download of {url} failed: {exc2!r}")
+            return False
+    except Exception as exc:
         print(f"Download of {url} failed: {exc!r}")
         return False
 
 
 def download_dataset(cfg: Config, force: bool = False) -> bool:
-    """Fetch ReDial (required) and MovieLens genres (optional metadata)."""
+    """Fetch ReDial dialogues and MovieLens genre metadata (both required)."""
     status = dataset_status(cfg)
     ok = True
     root = cfg.path("dataset_path")
@@ -141,7 +159,7 @@ def download_dataset(cfg: Config, force: bool = False) -> bool:
                 zf.extract("ml-latest/movies.csv", cfg.path("external_path"))
             z.unlink(missing_ok=True)
         else:
-            print("MovieLens genres unavailable; items will have empty genre lists.")
+            ok = False
     return ok
 
 
@@ -152,6 +170,14 @@ def validate_dataset(cfg: Config) -> pd.DataFrame:
         raise DatasetUnavailable(
             f"ReDial files missing under {cfg.path('dataset_path')}: "
             f"{redial.loc[~redial.present, 'file'].tolist()}. Download from {REDIAL_URL}"
+        )
+    ml = status[status.source == "MovieLens"]
+    if not ml["present"].all():
+        raise DatasetUnavailable(
+            "MovieLens genre metadata missing: expected "
+            f"{cfg.path('external_path') / 'ml-latest' / 'movies.csv'}. Genres drive the LTP/STI signals and "
+            "the relationship labels, so the pipeline refuses to run without them. Download "
+            f"{MOVIELENS_URL}, extract movies.csv to that path, then delete data/interim and data/processed."
         )
     return status
 
