@@ -183,7 +183,7 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         ax[1].legend()
     d = T.get("sens_intensity")
     if d is not None and len(d):
-        for i, m in enumerate([m for m in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", PRIMARY] if m in set(d.model)]):
+        for i, m in enumerate([m for m in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "SASRec", "KBRD-style", PRIMARY] if m in set(d.model)]):
             dd = d[d.model == m]
             ax[2].plot(dd.intensity, dd["Hit@10"], marker="o", label=m, color=PALETTE[i])
         ax[2].set_title("Synthetic conflict intensity (Conflict/Override)")

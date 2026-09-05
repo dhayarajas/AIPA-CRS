@@ -56,7 +56,8 @@ VARIANTS: dict[str, Variant] = {
     "AIPA (rule policy)": Variant("AIPA (rule policy)", learned_policy=False),
     "AIPA (full)": Variant("AIPA (full)"),
 }
-BASELINE_NAMES = ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware"]
+BASELINE_NAMES = ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware",
+                  "SASRec", "KBRD-style"]
 
 
 def mlp(i: int, h: int, o: int, p: float = 0.1) -> nn.Sequential:
@@ -81,6 +82,19 @@ class ItemTower(nn.Module):
 def masked_mean(x: torch.Tensor, ids: torch.Tensor) -> torch.Tensor:
     m = (ids > 0).float().unsqueeze(-1)
     return (x * m).sum(1) / m.sum(1).clamp(min=1.0)
+
+
+def score_items(h: torch.Tensor, items: torch.Tensor, bias: torch.Tensor) -> torch.Tensor:
+    """Dot-product scores against every item plus item bias; padding column 0 masked."""
+    s = h @ items.T + bias
+    s[:, 0] = -1e9
+    return s
+
+
+def left_align(ids: torch.Tensor) -> torch.Tensor:
+    """Move padding (0) to the front of each row, keeping the order of real ids."""
+    order = torch.argsort((ids > 0).long(), dim=1, stable=True)
+    return ids.gather(1, order)
 
 
 class LTPEncoder(nn.Module):
@@ -246,9 +260,7 @@ class AIPA(nn.Module):
         self.register_buffer("action_weights", ACTION_WEIGHTS.clone())
 
     def _score(self, h: torch.Tensor, items: torch.Tensor) -> torch.Tensor:
-        s = h @ items.T + self.items.bias
-        s[:, 0] = -1e9
-        return s
+        return score_items(h, items, self.items.bias)
 
     def forward(self, batch: dict, ltp_scale: float = 1.0, sti_scale: float = 1.0,
                 fixed_alpha: float | None = None) -> dict:
@@ -340,12 +352,116 @@ class ConversationBaseline(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+class SASRecBaseline(nn.Module):
+    """Self-attentive sequential recommender (SASRec; Kang & McAuley, "Self-Attentive
+    Sequential Recommendation", ICDM 2018) over the cross-session liked-item history
+    followed by the in-dialogue liked items.  Stacked causal transformer blocks with
+    learned absolute positions; the representation at the last real position scores
+    every item through the shared ``ItemTower``.  Dialogue text is *not* used, so this
+    is the strongest history-only comparison point.  Approximate re-implementation on
+    ReDial, not the original code."""
+
+    def __init__(self, content: torch.Tensor, text_dim: int, hidden: int, max_history: int, variant: Variant | None = None,
+                 n_blocks: int = 2, n_heads: int = 2, dropout: float = 0.1, max_cur_items: int = 10):
+        super().__init__()
+        self.variant = variant or Variant("SASRec", fusion="sasrec")
+        self.items = ItemTower(content, hidden)
+        self.max_len = max_history + max_cur_items
+        self.pos = nn.Embedding(self.max_len, hidden)
+        self.drop = nn.Dropout(dropout)
+        layer = nn.TransformerEncoderLayer(hidden, n_heads, dim_feedforward=2 * hidden, dropout=dropout,
+                                           activation="gelu", batch_first=True, norm_first=True)
+        self.blocks = nn.TransformerEncoder(layer, n_blocks, enable_nested_tensor=False)
+        self.norm = nn.LayerNorm(hidden)
+
+    def states(self, seq: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Per-position hidden states ``[B, L, H]`` and the real-token mask ``[B, L]``."""
+        seq = left_align(seq)[:, -self.max_len:]
+        B, L = seq.shape
+        real = (seq > 0)
+        e = self.items.lookup(seq) + self.pos.weight[:L].unsqueeze(0)
+        e = self.drop(e) * real.float().unsqueeze(-1)
+        causal = torch.ones(L, L, dtype=torch.bool, device=seq.device).triu(1)
+        pad = ~real.unsqueeze(1).expand(B, L, L)
+        mask = (causal.unsqueeze(0) | pad) & ~torch.eye(L, dtype=torch.bool, device=seq.device).unsqueeze(0)
+        mask = mask.repeat_interleave(self.blocks.layers[0].self_attn.num_heads, 0)
+        h = self.blocks(e, mask=mask)
+        return self.norm(h) * real.float().unsqueeze(-1), real
+
+    def encode(self, seq: torch.Tensor) -> torch.Tensor:
+        h, real = self.states(seq)
+        return h[:, -1] * real.any(1).float().unsqueeze(-1)
+
+    def forward(self, batch: dict, **_) -> dict:
+        h = self.encode(torch.cat([batch["history"], batch["cur_items"]], 1))
+        return {"scores": score_items(h, self.items.all_items(), self.items.bias)}
+
+    def parameter_count(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+class KBRDBaseline(nn.Module):
+    """KBRD-style conversation-aware recommender (Chen et al., "Towards Knowledge-Based
+    Recommender Dialog System", EMNLP 2019).  Entity-centric dialogue model: the items
+    and genre "entities" mentioned in the current dialogue are embedded and pooled
+    (self-attentive pooling as in KBRD, or a mean), a text encoder reads the dialogue
+    context and last utterance, the two are fused with a learned gate, and every item
+    is scored through the shared ``ItemTower`` plus a genre-aware bias derived from the
+    dialogue genre cues.
+
+    This is an approximate re-implementation on ReDial without the external
+    knowledge graph (DBpedia entity linking and R-GCN propagation are replaced by the
+    item tower and MovieLens genre features) and without the response generator; it is
+    not the original code and its numbers are not comparable to the published ones."""
+
+    def __init__(self, content: torch.Tensor, text_dim: int, hidden: int, max_history: int, variant: Variant | None = None,
+                 pooling: str = "attention"):
+        super().__init__()
+        if pooling not in ("attention", "mean"):
+            raise ValueError(f"unknown pooling {pooling!r}")
+        self.variant = variant or Variant("KBRD-style", fusion="kbrd")
+        self.pooling = pooling
+        self.items = ItemTower(content, hidden)
+        self.genre_ent = nn.Embedding(N_GENRES, hidden)
+        self.query = nn.Parameter(torch.randn(hidden) * 0.02)
+        self.text = mlp(2 * text_dim, hidden, hidden)
+        self.gate = nn.Linear(2 * hidden, hidden)
+        self.genre_bias = nn.Linear(N_GENRES, N_GENRES, bias=False)
+
+    def entities(self, batch: dict) -> torch.Tensor:
+        cur = batch["cur_items"]
+        g = batch["sti_genres"]
+        e = torch.cat([self.items.lookup(cur), self.genre_ent.weight.unsqueeze(0).expand(cur.shape[0], -1, -1) * g.unsqueeze(-1)], 1)
+        present = torch.cat([cur > 0, g > 0], 1)
+        if self.pooling == "mean":
+            return masked_mean(e, present.long())
+        att = (e @ self.query).masked_fill(~present, -1e9).softmax(-1) * present.any(1, keepdim=True).float()
+        return (att.unsqueeze(-1) * e).sum(1)
+
+    def forward(self, batch: dict, **_) -> dict:
+        h_ent = self.entities(batch)
+        h_txt = self.text(torch.cat([batch["context"], batch["last"]], -1))
+        gate = torch.sigmoid(self.gate(torch.cat([h_ent, h_txt], -1)))
+        h = gate * h_ent + (1 - gate) * h_txt
+        item_genres = self.items.content[:, -N_GENRES:]
+        s = score_items(h, self.items.all_items(), self.items.bias) + self.genre_bias(batch["sti_genres"]) @ item_genres.T
+        return {"scores": s}
+
+    def parameter_count(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 def build_model(name: str, content: torch.Tensor, cfg) -> nn.Module:
     kw = dict(content=content, text_dim=content.shape[1] - N_GENRES, hidden=cfg.hidden_dim, max_history=cfg.max_history)
     if name == "Sequential (GRU)":
         return SequentialBaseline(**kw)
     if name == "Conversation-aware":
         return ConversationBaseline(**kw)
+    if name == "SASRec":
+        return SASRecBaseline(n_blocks=cfg.values.get("sasrec_blocks", 2), n_heads=cfg.values.get("sasrec_heads", 2),
+                              dropout=cfg.values.get("sasrec_dropout", 0.1), **kw)
+    if name == "KBRD-style":
+        return KBRDBaseline(pooling=cfg.values.get("kbrd_pooling", "attention"), **kw)
     return AIPA(variant=VARIANTS[name], rel_threshold=cfg.relationship_threshold, cf_tau=cfg.cf_tau,
                 cf_dominance=cfg.cf_dominance,
                 top_k=min(cfg.top_k), **kw)

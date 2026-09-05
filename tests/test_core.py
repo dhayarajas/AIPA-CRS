@@ -13,7 +13,7 @@ from aipa.data import GENRES as ALL_GENRES
 from aipa.data import Dialogue, ReDial
 from aipa.evaluate import arbitration_metrics, bootstrap_ci, paired_test, per_sample_ranking, relationship_metrics
 from aipa.labeling import inject_controlled, label_all
-from aipa.models import CounterfactualDiagnostic, build_model, clarification_question
+from aipa.models import BASELINE_NAMES, CounterfactualDiagnostic, build_model, clarification_question, left_align
 from aipa.preprocess import ItemIndex, SeekerMemory, build_instances, marker_hits, tensorise
 from aipa.train import label_tensors
 
@@ -244,10 +244,12 @@ def test_models_forward_shapes(mini, cfg):
     X = tensorise(inst["train"], enc, index, cfg)
     Y = label_tensors(label_all(inst["train"], cfg))
     assert Y["rel"].shape[0] == X["target"].shape[0]
-    for name in ["LTP-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware", "AIPA (rule policy)", "AIPA (full)"]:
+    for name in BASELINE_NAMES + ["AIPA (rule policy)", "AIPA (full)"]:
         model = build_model(name, index.content, cfg)
         out = model(X)
         assert out["scores"].shape == (X["target"].shape[0], index.n)
+        assert torch.isfinite(out["scores"][:, 1:]).all() and (out["scores"][:, 0] < -1e8).all()
+        assert model.parameter_count() > 0
         if name.startswith("AIPA"):
             assert out["rel_logits"].shape[1] == len(RELATIONSHIPS) and out["act_logits"].shape[1] == len(ACTIONS)
             w = torch.stack([out["w_ltp"], out["w_sti"]], 1)
@@ -368,3 +370,69 @@ def test_architecture_figure_reports_the_active_config(cfg):
         assert "[B, 7]" in text or "[B,7]" in text
         assert "k = 4" in text and "K = 5" in text
         assert "0.25" in text and "0.75" in text
+
+
+def test_left_align_keeps_order_and_moves_padding_front():
+    ids = torch.tensor([[0, 3, 0, 5, 7], [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]])
+    out = left_align(ids)
+    assert out.tolist() == [[0, 0, 3, 5, 7], [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]]
+
+
+def test_sasrec_is_causal_and_handles_empty_sequences(mini, cfg):
+    from aipa.models import SASRecBaseline
+
+    content = torch.randn(30, 8 + 19)
+    m = SASRecBaseline(content, text_dim=8, hidden=16, max_history=6, n_blocks=2, n_heads=2, dropout=0.0).eval()
+    hist = torch.tensor([[0, 0, 0, 3, 4, 5], [0, 0, 0, 0, 0, 0]])
+    cur = torch.zeros(2, 10, dtype=torch.long)
+    out = m({"history": hist, "cur_items": cur})["scores"]
+    assert torch.isfinite(out[:, 1:]).all()
+    # empty sequence -> zero encoding -> item bias only (all-zero here)
+    assert torch.allclose(out[1, 1:], m.items.bias[1:])
+    # causal mask: changing the last item must not alter the states of earlier positions
+    with torch.no_grad():
+        h_a, _ = m.states(torch.tensor([[0, 0, 3, 4, 5, 9]]))
+        h_b, _ = m.states(torch.tensor([[0, 0, 3, 4, 5, 7]]))
+    assert torch.allclose(h_a[0, :5], h_b[0, :5], atol=1e-6)
+    assert not torch.allclose(h_a[0, 5], h_b[0, 5])
+    # history then cur_items: an item in cur_items is the most recent position
+    with torch.no_grad():
+        joint = m.encode(torch.cat([torch.tensor([[0, 0, 0, 3, 4, 5]]), torch.tensor([[0, 0, 0, 9]])], 1))
+        flat = m.encode(torch.tensor([[0, 0, 0, 0, 0, 0, 3, 4, 5, 9]]))
+    assert torch.allclose(joint, flat, atol=1e-6)
+
+
+def test_kbrd_pooling_modes_and_genre_bias(mini, cfg):
+    from aipa.models import N_GENRES, KBRDBaseline
+
+    content = torch.zeros(20, 8 + N_GENRES)
+    content[5, 8] = 1.0  # item 5 carries genre 0
+    batch = {"cur_items": torch.tensor([[0, 0, 3, 4]]), "sti_genres": torch.zeros(1, N_GENRES),
+             "context": torch.randn(1, 8), "last": torch.randn(1, 8)}
+    batch["sti_genres"][0, 0] = 1.0
+    for pooling in ["attention", "mean"]:
+        m = KBRDBaseline(content, text_dim=8, hidden=16, max_history=6, pooling=pooling).eval()
+        s = m(batch)["scores"]
+        assert s.shape == (1, 20) and torch.isfinite(s[:, 1:]).all()
+    with pytest.raises(ValueError):
+        KBRDBaseline(content, text_dim=8, hidden=16, max_history=6, pooling="max")
+    # genre bias: with a positive weight on genre 0 the item carrying that genre gains score
+    m = KBRDBaseline(content, text_dim=8, hidden=16, max_history=6).eval()
+    with torch.no_grad():
+        m.genre_bias.weight.zero_()
+        base = m(batch)["scores"].clone()
+        m.genre_bias.weight[0, 0] = 2.0
+        biased = m(batch)["scores"]
+    assert torch.isclose(biased[0, 5] - base[0, 5], torch.tensor(2.0))
+    assert torch.isclose(biased[0, 6], base[0, 6])
+
+
+def test_disabled_models_removed_from_experiment_loop():
+    from aipa.experiments import MODEL_ORDER
+
+    cfg = load_config("quick")
+    assert "SASRec" in MODEL_ORDER and "KBRD-style" in MODEL_ORDER
+    cfg.values["disabled_models"] = ["SASRec", "KBRD-style"]
+    disabled = set(cfg.disabled_models)
+    kept = [m for m in MODEL_ORDER if m not in disabled]
+    assert "SASRec" not in kept and "AIPA (full)" in kept

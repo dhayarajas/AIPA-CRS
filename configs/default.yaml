@@ -74,6 +74,16 @@ common:
   criteria_unnecessary_clarification_max: 0.10
   lambda_rel: 0.5
   lambda_act: 0.3
+  # stronger baselines trained on identical inputs (same losses / seeds / epochs).
+  # SASRec: causal self-attention over history + in-dialogue liked items.
+  sasrec_blocks: 2
+  sasrec_heads: 2
+  sasrec_dropout: 0.1
+  # KBRD-style: pooling of mentioned item / genre entities, "attention" or "mean".
+  kbrd_pooling: attention
+  # models listed here are skipped by the experiment loop, e.g. [SASRec, KBRD-style]
+  # restores the previous baseline set.
+  disabled_models: []
   n_case_studies: 12
   num_workers: 0
 

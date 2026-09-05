@@ -21,6 +21,7 @@ from .data import (
 )
 from .experiments import PRIMARY, Results, run_experiments
 from .figures import make_all
+from .models import BASELINE_NAMES
 from .report import build_report
 
 
@@ -49,8 +50,12 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     add("controlled synthetic injection", res.labels.is_synthetic.any(), f"{int(res.labels.is_synthetic.sum())} synthetic test instances")
     checks.append(("human-verified labels", "PASS" if res.status.get("human_verified_labels") == "RUN" else "NOT RUN", res.status.get("human_verified_labels", "")))
     models = set(res.per_sample.model)
-    for m in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware"]:
-        add(f"baseline: {m}", m in models, "")
+    disabled = set(res.cfg.values.get("disabled_models", []))
+    for m in BASELINE_NAMES:
+        if m in disabled:
+            checks.append((f"baseline: {m}", "NOT RUN", "disabled in config"))
+        else:
+            add(f"baseline: {m}", m in models, "")
     for m in ["AIPA w/o relationship", "AIPA w/o counterfactual", "AIPA w/o clarification", "AIPA w/o persistence", "AIPA (rule policy)", PRIMARY]:
         add(f"model: {m}", m in models, "")
     add("relationship classifier metrics", len(T.get("relationship", [])) > 0, "")

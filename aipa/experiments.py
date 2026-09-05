@@ -171,7 +171,8 @@ def _persistence_sweep(model: AIPA, inst: list[Instance], X: dict, cfg: Config, 
 def run_experiments(cfg: Config, verbose: bool = True, models: list[str] | None = None, prepared: tuple | None = None) -> Results:
     t_start = time.perf_counter()
     ds, enc, index, inst, labels, X, human = prepared or prepare(cfg, verbose)
-    models = models or MODEL_ORDER
+    disabled = set(cfg.values.get("disabled_models", []))
+    models = models or [m for m in MODEL_ORDER if m not in disabled]
     Y = {k: label_tensors(v) for k, v in labels.items()}
     test_inst = inst["test"]
     test_meta = instances_frame(test_inst)
