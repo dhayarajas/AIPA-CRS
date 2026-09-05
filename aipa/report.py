@@ -44,10 +44,17 @@ def _perf_table(d: pd.DataFrame, metrics=("Hit@10", "NDCG@10", "MRR@10", "Hit@20
     if d is None or not len(d):
         return pd.DataFrame()
     out = pd.DataFrame({"model": d.model, "n": d.n})
+    if "subset" in d:
+        out.insert(0, "subset", d.subset.values)
     for m in metrics:
         out[m] = [f"{a:.3f} ± {s:.3f} [{lo:.3f}, {hi:.3f}]" for a, s, lo, hi in
                   zip(d[f"{m}_mean"], d[f"{m}_std"], d[f"{m}_ci_low"], d[f"{m}_ci_high"])]
     return out
+
+
+SIG_COLS = ["control", "n", "n_samples", "n_seeds", "mean_diff", "seed_std_diff", "t_p", "t_p_holm", "wilcoxon_p", "wilcoxon_p_holm",
+            "perm_p", "perm_p_holm", "cohen_d", "cliffs_delta"]
+CONFLICT_SUBSETS = ["conflict_natural_strict", "conflict_natural_broad", "conflict_synthetic"]
 
 
 def _verdict(sig: pd.DataFrame, subset: str, metric: str, control: str) -> tuple[str, dict | None]:
@@ -95,7 +102,11 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
       "* **H4** - The relationship classifier recovers reference labels above chance and is reasonably calibrated.\n")
     A("Decision rule: a hypothesis is *supported* when the paired Wilcoxon test (Holm-corrected within a table) on per-instance "
       f"Hit@10 gives p < {ALPHA} in the hypothesised direction; *contradicted* when p < {ALPHA} in the opposite direction; otherwise "
-      "*not supported*. Where a comparison could not be computed it is reported as NOT RUN.\n")
+      "*not supported*. Where a comparison could not be computed it is reported as NOT RUN. Paired differences are formed per "
+      "instance *within* each seed and pooled over seeds (n = instances x seeds); a paired t-test and a sign-flip permutation test "
+      "are reported alongside Wilcoxon, together with Cohen's d and Cliff's delta.\n")
+    A("### Success criteria (computed automatically from `outputs/results/success_criteria.csv`)\n")
+    A(_md_table(T.get("success_criteria"), nd=4))
     A("## 2. Data, labels and preprocessing\n")
     A(f"Dataset: **ReDial** (English conversational movie recommendation), source `{res.extra.get('dataset_source')}`. "
       "Item genres are joined from MovieLens `ml-latest` by normalised title + year (items without a match have empty genre lists).\n")
@@ -117,11 +128,15 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
         A(f"![overall]({fig_rel('fig03_overall_natural')})\n")
     A("### Paired significance vs. baselines (natural, Hit@10)\n")
     s = sig[(sig.subset == "natural") & (sig.metric == "Hit@10")] if len(sig) else pd.DataFrame()
-    A(_md_table(s[["control", "n", "mean_diff", "t_p", "t_p_holm", "wilcoxon_p", "wilcoxon_p_holm", "cohen_d", "cliffs_delta"]] if len(s) else s, nd=4))
+    A(_md_table(s[SIG_COLS] if len(s) else s, nd=4))
     A("## 4. Conflict-sensitive evaluation\n")
-    A("### 4.1 Natural Conflict/Override subset (weak-rule labels; noisy)\n")
+    A("Two natural subsets are evaluated: **strict** = weak-rule label in " + "/".join(cfg.conflict_strict_labels) +
+      f"; **broad** (disagreement) = strict OR (weak-rule confidence >= {cfg.disagreement_conf_min} AND Jensen-Shannon divergence "
+      f"between the LTP and STI genre distributions >= {cfg.disagreement_js_min}). Both rely on weak-rule labels, not human labels.\n")
+    A(_md_table(T.get("conflict_subset_sizes")))
+    A("### 4.1 Natural conflict subsets (weak-rule labels; noisy)\n")
     A(_md_table(_perf_table(T.get("conflict_natural"))))
-    A("### 4.2 Natural non-conflict subset\n")
+    A("### 4.2 Natural non-disagreement subset (complement of the broad subset)\n")
     A(_md_table(_perf_table(T.get("nonconflict_natural"))))
     A("### 4.3 Controlled synthetic Conflict/Override subset\n")
     A("Targets on this subset are *sampled* items that match the injected intent; the numbers measure whether a system follows a "
@@ -131,9 +146,13 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
         A(f"![conflict]({fig_rel('fig04_conflict_vs_nonconflict')})\n")
     if fig_rel("fig05_relationship_subsets"):
         A(f"![subsets]({fig_rel('fig05_relationship_subsets')})\n")
-    A("### 4.4 Paired significance on conflict subsets (Hit@10)\n")
-    s = sig[sig.subset.isin(["conflict_natural", "conflict_synthetic"]) & (sig.metric == "Hit@10")] if len(sig) else pd.DataFrame()
-    A(_md_table(s[["subset", "control", "n", "mean_diff", "wilcoxon_p", "wilcoxon_p_holm", "cohen_d", "cliffs_delta"]] if len(s) else s, nd=4))
+    A("### 4.4 Synthetic conflict subset by injection intensity (mean ± std over seeds)\n")
+    cbi = T.get("conflict_synthetic_by_intensity")
+    if cbi is not None and len(cbi):
+        A(_md_table(cbi[["intensity", "model", "n", "seeds", "Hit@10_mean", "Hit@10_std", "NDCG@10_mean", "NDCG@10_std"]]))
+    A("### 4.5 Paired significance on conflict subsets (Hit@10)\n")
+    s = sig[sig.subset.isin(CONFLICT_SUBSETS) & (sig.metric == "Hit@10")] if len(sig) else pd.DataFrame()
+    A(_md_table(s[["subset"] + SIG_COLS] if len(s) else s, nd=4))
     A("## 5. Relationship classification, arbitration and clarification\n")
     rel = T.get("relationship", pd.DataFrame())
     if len(rel):
@@ -167,12 +186,45 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
         A(f"![counterfactual]({fig_rel('fig08_counterfactual')})\n")
     A("## 7. Temporary override vs. persistent preference shift\n")
     ps_ = T.get("persistence_shifts", pd.DataFrame())
-    A(f"Persistent shifts detected on the test set (genre prioritised in ≥ {cfg.persistence_k} distinct sessions of a seeker): "
+    A(f"The tracker is replayed in chronological order per seeker over the natural test dialogues (`conversationId`, then turn). "
+      f"Persistent shifts detected on the test set (genre prioritised in ≥ {cfg.persistence_k} distinct sessions of a seeker): "
       f"**{len(ps_)}** across {ps_.seed.nunique() if len(ps_) else 0} seed(s).\n")
     A(_md_table(ps_.head(20)))
+    pe = T.get("persistence_effect", pd.DataFrame())
+    if len(pe):
+        A(f"Effect of the tracker (AIPA (full) vs AIPA w/o persistence, Hit@10) on all natural instances, on instances of seekers with "
+          f">= {cfg.persistence_min_sessions} test sessions, and on the instances whose LTP prior the tracker actually changed:\n")
+        A(_md_table(pe, nd=4))
+        aff = pe[pe.subset == "tracker_affected"].iloc[0]
+        if aff.n == 0:
+            A("**The tracker did not change any test instance in this run**, so AIPA (full) and AIPA w/o persistence are identical and "
+              "no persistence effect can be claimed.\n")
+        elif np.isnan(aff.get("perm_p", np.nan)) or aff.get("perm_p", 1.0) >= ALPHA:
+            A(f"The tracker changed {int(aff.n)} instance(s) but the Hit@10 difference on that subset is not significant; "
+              "no persistence effect is claimed.\n")
+    sw = T.get("persistence_sweep", pd.DataFrame())
+    if len(sw):
+        A(f"`persistence_k` sweep over {cfg.persistence_k_grid} (validation split for selection; the test rows are reported for "
+          f"transparency only and were not used to choose k = {cfg.persistence_k}):\n")
+        cols = [c for c in ["split", "k", "seeds", "n_shifts_mean", "n_seekers_shifted_mean", "n_multi_session_mean", "n_affected_mean",
+                            "hit10_multi_without_mean", "hit10_multi_with_mean", "hit10_multi_delta_mean", "hit10_affected_without_mean",
+                            "hit10_affected_with_mean", "n_rank_changed_mean"] if c in sw]
+        A(_md_table(sw[cols], nd=4))
     A("## 8. Sensitivity analyses\n")
     A("### History length (LTP) - AIPA (full), natural\n")
     A(_md_table(T.get("sens_history")))
+    A("### History-length buckets - Hit@10 of every model (natural; mean ± std over seeds)\n")
+    hb = T.get("history_buckets")
+    if hb is not None and len(hb):
+        A(_md_table(hb[["history_bucket", "model", "n", "seeds", "Hit@10_mean", "Hit@10_std", "NDCG@10_mean", "NDCG@10_std"]], max_rows=100))
+    if fig_rel("fig09b_history_buckets"):
+        A(f"![history buckets]({fig_rel('fig09b_history_buckets')})\n")
+    A(f"### Target genre (top-{cfg.genre_breakdown_top}) - Hit@10 of every model (natural; mean ± std over seeds)\n")
+    gb = T.get("genre_breakdown")
+    if gb is not None and len(gb):
+        A(_md_table(gb[["target_genre", "model", "n", "seeds", "Hit@10_mean", "Hit@10_std", "NDCG@10_mean", "NDCG@10_std"]], max_rows=120))
+    if fig_rel("fig09c_genre_breakdown"):
+        A(f"![genre breakdown]({fig_rel('fig09c_genre_breakdown')})\n")
     A("### STI context length - AIPA (full), natural\n")
     A(_md_table(T.get("sens_sti_length")))
     A("### Synthetic conflict intensity (Conflict/Override, Hit@10 on injected target)\n")
@@ -217,7 +269,7 @@ def build_report(res: Results, figures: dict[str, Path], validation: pd.DataFram
     for c in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion", "Sequential (GRU)", "Conversation-aware"]:
         v, r = _verdict(sig, "natural", "Hit@10", c)
         rows.append({"hypothesis": "H1 (overall)", "comparison": f"{PRIMARY} vs {c}", "verdict": v, "mean_diff": r["mean_diff"] if r else np.nan, "p_holm": r["wilcoxon_p_holm"] if r else np.nan})
-    for sub in ["conflict_natural", "conflict_synthetic"]:
+    for sub in CONFLICT_SUBSETS:
         for c in ["LTP-only", "STI-only", "Naive fusion", "Adaptive fusion"]:
             v, r = _verdict(sig, sub, "Hit@10", c)
             rows.append({"hypothesis": f"H2 ({sub})", "comparison": f"{PRIMARY} vs {c}", "verdict": v, "mean_diff": r["mean_diff"] if r else np.nan, "p_holm": r["wilcoxon_p_holm"] if r else np.nan})

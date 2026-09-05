@@ -44,7 +44,19 @@ common:
   injection_rate: 0.15
   injection_intensities: [1, 2, 3]
   bootstrap_samples: 500
+  permutation_samples: 2000
   min_history_for_ltp: 3
+  # conflict subsets (natural test instances): the strict subset is defined by
+  # the weak-rule label alone; the broad "disagreement" subset adds confident
+  # weak-rule labels whose LTP and STI genre distributions diverge (Jensen-
+  # Shannon divergence, base 2, in [0, 1]).
+  conflict_strict_labels: [Conflict, Override]
+  disagreement_conf_min: 0.6
+  disagreement_js_min: 0.5
+  # per-history-length buckets [name, min_items, max_items (null = open)] and
+  # number of target genres for the per-genre breakdown
+  history_buckets: [[cold, 0, 2], [short, 3, 9], [mid, 10, 24], [long, 25, null]]
+  genre_breakdown_top: 8
   # counterfactual driver diagnostic: top-K disagreement threshold for a driver
   cf_tau: 0.1
   cf_dominance: 1.5   # a signal is the sole driver when its top-K disruption is >= dominance x the other signal's
@@ -52,6 +64,14 @@ common:
   # override is treated as a persistent preference shift
   persistence_k: 2
   persistence_gain: 0.3
+  persistence_k_grid: [1, 2, 3]     # swept on the validation split (report only; test uses persistence_k)
+  persistence_min_sessions: 3       # the tracker is evaluated on seekers with >= this many test sessions
+  # automatic success criteria (outputs/results/success_criteria.csv)
+  criteria_alpha: 0.05
+  criteria_macro_f1_min: 0.5
+  criteria_conflict_f1_min: 0.5
+  criteria_clarification_precision_min: 0.5
+  criteria_unnecessary_clarification_max: 0.10
   lambda_rel: 0.5
   lambda_act: 0.3
   n_case_studies: 12
@@ -75,6 +95,6 @@ full:
   hidden_dim: 64
   text_dim: 128                 # only used when embedding_model is tfidf-svd
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  seeds: [42, 7, 123]
+  seeds: [42, 7, 123, 2024, 31337]
   bootstrap_samples: 1000
   batch_size: 256

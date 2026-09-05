@@ -254,6 +254,104 @@ def test_models_forward_shapes(mini, cfg):
             assert torch.allclose(w.sum(1), torch.ones(w.shape[0]), atol=1e-4)
 
 
+def test_js_divergence_bounds_and_symmetry():
+    from aipa.evaluate import js_divergence
+
+    assert js_divergence({"Comedy": 1.0}, {"Comedy": 1.0}) == pytest.approx(0.0)
+    assert js_divergence({"Comedy": 1.0}, {"Horror": 1.0}) == pytest.approx(1.0)
+    a, b = {"Comedy": 0.7, "Drama": 0.3}, {"Drama": 0.5, "Horror": 0.5}
+    assert 0.0 < js_divergence(a, b) < 1.0
+    assert js_divergence(a, b) == pytest.approx(js_divergence(b, a))
+    assert np.isnan(js_divergence({}, {"Comedy": 1.0}))
+
+
+def test_pooled_paired_test_pools_within_seed():
+    from aipa.evaluate import cliffs_delta, permutation_test, pooled_paired_test
+
+    rng = np.random.RandomState(0)
+    base = {s: rng.rand(40) for s in (1, 2, 3)}
+    treat = {s: base[s] + 0.2 + rng.normal(0, 0.01, 40) for s in base}
+    r = pooled_paired_test(treat, base)
+    assert r["n"] == 120 and r["n_samples"] == 40 and r["n_seeds"] == 3
+    assert r["mean_diff"] == pytest.approx(0.2, abs=0.01)
+    assert r["seed_std_diff"] < 0.01
+    assert r["perm_p"] < 0.01 and r["t_p"] < 0.01
+    assert -1.0 <= r["cliffs_delta"] <= 1.0
+    # a seed-level mean shift with no within-seed difference must not be significant
+    same = {s: base[s] for s in base}
+    r0 = pooled_paired_test(same, base)
+    assert np.isnan(r0["perm_p"]) and r0["mean_diff"] == 0.0
+    assert cliffs_delta(np.ones(5), np.zeros(5)) == pytest.approx(1.0)
+    assert 0.0 <= permutation_test(np.array([0.1, -0.1, 0.05, -0.05, 0.0]), n_perm=200) <= 1.0
+
+
+def test_disagreement_mask_is_superset_of_strict(mini, cfg):
+    import pandas as pd
+
+    from aipa.labeling import disagreement_mask, labels_frame, strict_conflict_mask
+
+    inst = build_instances(mini, cfg)
+    test = inst["test"] + inject_controlled(inst["test"], mini, cfg, inst["train"], 1)
+    lab = labels_frame(test, label_all(test, cfg))
+    assert "js_divergence" in lab and lab.js_divergence.dropna().between(0, 1).all()
+    strict, broad = strict_conflict_mask(lab, cfg), disagreement_mask(lab, cfg)
+    assert not (strict & ~broad).any()
+    assert not (broad & lab.is_synthetic.values).any()
+    # a confident, divergent non-Conflict natural instance joins the broad subset only
+    fake = pd.DataFrame({"relationship_label": ["Consistent", "Conflict", "Consistent", "Uncertain"],
+                         "confidence": [0.9, 0.5, 0.9, 0.9], "js_divergence": [1.0, 0.0, 0.1, np.nan],
+                         "is_synthetic": [False, False, False, False]})
+    assert disagreement_mask(fake, cfg).tolist() == [True, True, False, False]
+    assert strict_conflict_mask(fake, cfg).tolist() == [False, True, False, False]
+
+
+def test_history_buckets_follow_config(cfg):
+    from aipa.experiments import history_bucket
+
+    b = history_bucket([0, 2, 3, 9, 10, 24, 25, 200], cfg)
+    assert list(b.astype(str)) == ["cold", "cold", "short", "short", "mid", "mid", "long", "long"]
+
+
+def test_persistence_tracker_fires_after_k_sessions_in_order():
+    from aipa.models import PersistenceTracker
+
+    tr = PersistenceTracker(k=2, gain=0.3)
+    ltp = torch.tensor([0.5, 0.5] + [0.0] * 16)
+    ltp = ltp / ltp.sum()
+    assert torch.allclose(tr.adjust("A", ltp), ltp)
+    tr.observe("A", 1, "Prioritize_STI", {"Horror": 1.0})
+    tr.observe("A", 1, "Prioritize_STI", {"Horror": 1.0})  # same session counted once
+    assert not tr.shifts and torch.allclose(tr.adjust("A", ltp), ltp)
+    tr.observe("A", 2, "Fuse", {"Horror": 1.0})  # not a prioritisation -> ignored
+    tr.observe("A", 3, "Prioritize_STI", {"Horror": 1.0})
+    assert len(tr.shifts) == 1 and tr.shifts[0]["genre"] == "Horror"
+    adj = tr.adjust("A", ltp)
+    assert not torch.allclose(adj, ltp) and adj.sum() == pytest.approx(1.0)
+    assert torch.allclose(tr.adjust("B", ltp), ltp)
+
+
+def test_persistence_override_is_chronological_and_marks_affected(mini, cfg):
+    from aipa.experiments import _persistence_override, _sessions_per_seeker
+
+    inst = build_instances(mini, cfg)
+    test = sorted(inst["test"], key=lambda x: (-x.conv_id, -x.turn))  # deliberately reverse order
+    n_sess = _sessions_per_seeker(test)
+    assert set(n_sess) == {1}
+    X = {"ltp_genres": torch.rand(len(test), 18)}
+    X["ltp_genres"] = X["ltp_genres"] / X["ltp_genres"].sum(1, keepdim=True)
+    pred = {"act_logits": np.tile(np.eye(len(ACTIONS))[ACTIONS.index("Prioritize_STI")], (len(test), 1))}
+    override, shifts, affected = _persistence_override(None, test, X, pred, cfg, k=1)
+    # with k=1 the first Prioritize_STI turn of each seeker creates a shift; only *later* turns of that seeker are affected
+    assert len(shifts) >= 1 and affected.sum() >= 1
+    first_turn = {x.seeker_id: min(y.turn for y in test if y.seeker_id == x.seeker_id) for x in test}
+    for i, x in enumerate(test):
+        if x.turn == first_turn[x.seeker_id]:
+            assert not affected[i]
+    assert torch.allclose(override[~torch.tensor(affected)], X["ltp_genres"][~torch.tensor(affected)])
+    _, shifts_k5, affected_k5 = _persistence_override(None, test, X, pred, cfg, k=5)
+    assert not shifts_k5 and not affected_k5.any()
+
+
 def test_architecture_figure_reports_the_active_config(cfg):
     import matplotlib.pyplot as plt
 

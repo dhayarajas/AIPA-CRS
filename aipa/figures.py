@@ -65,9 +65,16 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         a.tick_params(axis="x", rotation=20)
     reg("fig02_label_distribution", _save(fig, out, "fig02_label_distribution"))
     # 3. overall performance with CIs
-    for key, title in [("overall_natural", "Natural test instances"), ("overall_synthetic", "Controlled synthetic test instances"),
-                       ("conflict_natural", "Natural Conflict/Override subset"), ("conflict_synthetic", "Synthetic Conflict/Override subset")]:
-        d = T.get(key)
+    perf = [("overall_natural", "Natural test instances"), ("overall_synthetic", "Controlled synthetic test instances")]
+    perf_tabs = dict(T)
+    cn = T.get("conflict_natural")
+    if cn is not None and len(cn) and "subset" in cn:
+        for s in cn.subset.unique():
+            perf_tabs[f"conflict_natural_{s}"] = cn[cn.subset == s].reset_index(drop=True)
+            perf.append((f"conflict_natural_{s}", f"Natural conflict subset ({s})"))
+    perf.append(("conflict_synthetic", "Synthetic Conflict/Override subset"))
+    for key, title in perf:
+        d = perf_tabs.get(key)
         if d is None or not len(d):
             continue
         metrics = ["Hit@10", "NDCG@10", "MRR@10", "Hit@20"]
@@ -85,13 +92,15 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         reg(f"fig03_{key}", _save(fig, out, f"fig03_{key}"))
     # 4. conflict vs non-conflict
     if len(T.get("conflict_natural", [])) and len(T.get("nonconflict_natural", [])):
-        a1 = T["conflict_natural"].set_index("model")["Hit@10_mean"]
-        a2 = T["nonconflict_natural"].set_index("model")["Hit@10_mean"]
-        d = pd.DataFrame({"Conflict/Override (natural, weak labels)": a1, "Non-conflict (natural)": a2})
+        cn = T["conflict_natural"]
+        d = pd.DataFrame({"Non-disagreement (natural)": T["nonconflict_natural"].set_index("model")["Hit@10_mean"]})
+        for s, lbl in [("strict", "Conflict (natural, strict weak label)"), ("broad", "Disagreement (natural, broad)")]:
+            if "subset" in cn and (cn.subset == s).any():
+                d[lbl] = cn[cn.subset == s].set_index("model")["Hit@10_mean"]
         if len(T.get("conflict_synthetic", [])):
             d["Conflict/Override (synthetic, controlled)"] = T["conflict_synthetic"].set_index("model")["Hit@10_mean"]
         fig, ax = plt.subplots(figsize=(11, 4.5))
-        d.loc[[m for m in MODEL_ORDER if m in d.index]].plot.bar(ax=ax, width=0.8, color=PALETTE[:3])
+        d.loc[[m for m in MODEL_ORDER if m in d.index]].plot.bar(ax=ax, width=0.8, color=PALETTE[:len(d.columns)])
         ax.set_ylabel("Hit@10")
         ax.set_title("Conflict-sensitive evaluation: Hit@10 by subset")
         ax.tick_params(axis="x", rotation=30)
@@ -183,6 +192,32 @@ def make_all(res: Results, ds_stats: pd.DataFrame | None = None, genre_df: pd.Da
         ax[2].set_xticks(sorted(d.intensity.unique()))
         ax[2].legend(fontsize=8)
     reg("fig09_sensitivity", _save(fig, out, "fig09_sensitivity"))
+    # 9b/9c. per-history-length bucket and per-target-genre breakdowns (Hit@10, every model, mean +- std over seeds)
+    for key, col, title, xlabel, fname in [
+        ("history_buckets", "history_bucket", "Hit@10 by LTP history length (natural test)", "history bucket (prior liked/seen movies)", "fig09b_history_buckets"),
+        ("genre_breakdown", "target_genre", "Hit@10 by target genre (natural test, top genres)", "target genre", "fig09c_genre_breakdown"),
+    ]:
+        d = T.get(key)
+        if d is None or not len(d):
+            continue
+        models = [m for m in MODEL_ORDER if m in set(d.model)]
+        cats = [str(c) for c in d[col].astype(str).unique()]
+        fig, ax = plt.subplots(figsize=(max(8, 1.4 * len(cats) + 4), 4.8))
+        width = 0.8 / max(1, len(models))
+        xs = np.arange(len(cats))
+        for i, m in enumerate(models):
+            dd = d[d.model == m].set_index(d[d.model == m][col].astype(str)).reindex(cats)
+            color = PALETTE[3] if m == PRIMARY else (PALETTE[7] if m.startswith("AIPA") else PALETTE[i % 3])
+            ax.bar(xs + (i - len(models) / 2 + 0.5) * width, dd["Hit@10_mean"], width, yerr=dd["Hit@10_std"], label=m, color=color, capsize=2,
+                   alpha=0.5 if (m.startswith("AIPA") and m != PRIMARY) else 1.0)
+        ns = d[d.model == models[0]].set_index(d[d.model == models[0]][col].astype(str)).reindex(cats).n
+        ax.set_xticks(xs)
+        ax.set_xticklabels([f"{c}\n(n={int(n)})" if not np.isnan(n) else c for c, n in zip(cats, ns)])
+        ax.set_ylabel("Hit@10 (mean ± std over seeds)")
+        ax.set_xlabel(xlabel)
+        ax.set_title(title)
+        ax.legend(fontsize=7, ncol=2)
+        reg(fname, _save(fig, out, fname))
     # 10. alpha sweep
     d = T.get("alpha_sweep")
     if d is not None and len(d):

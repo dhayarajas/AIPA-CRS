@@ -62,6 +62,14 @@ def validate_components(res: Results, figures: dict, report_paths: tuple[Path, P
     add("multi-seed evaluation", res.per_sample.seed.nunique() >= 2, f"{res.per_sample.seed.nunique()} seed(s)" + ("" if res.per_sample.seed.nunique() >= 2 else " - increase `seeds` for std estimates"))
     add("conflict-sensitive evaluation", len(T.get("conflict_synthetic", [])) > 0 or len(T.get("conflict_natural", [])) > 0, "")
     add("sensitivity analyses", len(T.get("sens_history", [])) > 0 and len(T.get("sens_intensity", [])) > 0, "")
+    cn = T.get("conflict_natural", pd.DataFrame())
+    add("strict + broad natural conflict subsets", len(cn) > 0 and "subset" in cn and cn.subset.nunique() >= 2,
+        ", ".join(f"{r.subset}: n={r.n}" for r in T.get("conflict_subset_sizes", pd.DataFrame()).itertuples()) if len(T.get("conflict_subset_sizes", [])) else "")
+    add("history-bucket / genre breakdown", len(T.get("history_buckets", [])) > 0 and len(T.get("genre_breakdown", [])) > 0, "")
+    pe = T.get("persistence_effect", pd.DataFrame())
+    add("persistence effect on affected subset", len(pe) > 0,
+        f"n_affected={int(pe[pe.subset == 'tracker_affected'].n.iloc[0])}" if len(pe) else "")
+    add("success criteria table", len(T.get("success_criteria", [])) > 0, "")
     add("alpha sweep", len(T.get("alpha_sweep", [])) > 0, "")
     add("calibration analysis", len(T.get("calibration", [])) > 0, "")
     add("efficiency accounting", len(T.get("efficiency", [])) > 0, "")
