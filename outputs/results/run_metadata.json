@@ -1,7 +1,7 @@
 {
-  "run_mode": "quick",
+  "run_mode": "full",
   "config": {
-    "run_mode": "quick",
+    "run_mode": "full",
     "dataset_name": "ReDial",
     "dataset_source": "https://github.com/ReDialData/website/raw/data/redial_dataset.zip",
     "dataset_path": "data/raw/redial",
@@ -9,8 +9,8 @@
     "interim_path": "data/interim",
     "external_path": "data/external",
     "output_path": "outputs",
-    "embedding_model": "tfidf-svd",
-    "text_dim": 64,
+    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "text_dim": 128,
     "encoder_batch_size": 128,
     "text_cache": true,
     "embedding_fallback": true,
@@ -18,12 +18,15 @@
     "hidden_dim": 64,
     "learning_rate": 0.003,
     "weight_decay": 1e-05,
-    "batch_size": 128,
-    "epochs": 15,
+    "batch_size": 256,
+    "epochs": 20,
     "seed": 42,
     "seeds": [
       42,
-      7
+      7,
+      123,
+      2024,
+      31337
     ],
     "top_k": [
       10,
@@ -49,7 +52,7 @@
       2,
       3
     ],
-    "bootstrap_samples": 200,
+    "bootstrap_samples": 1000,
     "permutation_samples": 2000,
     "min_history_for_ltp": 3,
     "conflict_strict_labels": [
@@ -96,8 +99,25 @@
     "criteria_conflict_f1_min": 0.5,
     "criteria_clarification_precision_min": 0.5,
     "criteria_unnecessary_clarification_max": 0.1,
-    "lambda_rel": 0.5,
-    "lambda_act": 0.3,
+    "lambda_rel": 1.0,
+    "lambda_act": 0.6,
+    "learned_action_weights": true,
+    "residual_gate": false,
+    "rec_loss": "softmax",
+    "n_negatives": 256,
+    "conflict_loss_weight": 2.0,
+    "rel_label_smoothing": 0.1,
+    "self_train": true,
+    "self_train_start_epoch": 3,
+    "self_train_min_conf": 0.6,
+    "self_train_threshold": 0.9,
+    "injection_relationships": [
+      "Conflict",
+      "Override",
+      "Consistent",
+      "Complement",
+      "Uncertain"
+    ],
     "sasrec_blocks": 2,
     "sasrec_heads": 2,
     "sasrec_dropout": 0.1,
@@ -105,7 +125,7 @@
     "disabled_models": [],
     "n_case_studies": 12,
     "num_workers": 0,
-    "subset_fraction": 0.25
+    "subset_fraction": 1.0
   },
   "environment": {
     "python": "3.12.8",
@@ -129,17 +149,17 @@
     "human_verified_labels": "NOT RUN (no data/annotations/human_verified.csv provided)"
   },
   "text_encoder": {
-    "requested": "tfidf-svd",
-    "name": "tfidf-svd",
-    "dim": 64,
-    "pretrained": false,
+    "requested": "sentence-transformers/all-MiniLM-L6-v2",
+    "name": "sentence-transformers/all-MiniLM-L6-v2",
+    "dim": 384,
+    "pretrained": true,
     "fallback_reason": null,
-    "batch_size": null,
-    "encode_seconds": 1.17,
-    "n_newly_encoded": 0,
-    "n_cache_hits": 0,
-    "cache_size": null,
-    "cache_path": null
+    "batch_size": 128,
+    "encode_seconds": 135.41,
+    "n_newly_encoded": 74482,
+    "n_cache_hits": 8576,
+    "cache_size": 74482,
+    "cache_path": "/home/ubuntu/AIPA-CRS/data/interim/text_cache_sentence-transformers_all-MiniLM-L6-v2_d46f7701.npz"
   },
   "dataset_source": "https://github.com/ReDialData/website/raw/data/redial_dataset.zip ; genres: https://files.grouplens.org/datasets/movielens/ml-latest.zip",
   "file_hashes": {
@@ -148,9 +168,9 @@
     "movies_with_mentions.csv": "14006c0c2368e6686c441c2cd7a19e20e2e23a83",
     "movies.csv": "20d8b843217b613669b0a8ab3d938823002956d2"
   },
-  "n_train": 9281,
-  "n_valid": 853,
-  "n_test": 1202,
-  "runtime_s": 161.12986057200033,
-  "timestamp_utc": "2026-09-05T11:47:36.510852+00:00"
+  "n_train": 36883,
+  "n_valid": 3541,
+  "n_test": 5096,
+  "runtime_s": 4075.8091310540003,
+  "timestamp_utc": "2026-09-05T18:01:06.939901+00:00"
 }
