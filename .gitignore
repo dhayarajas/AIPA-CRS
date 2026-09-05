@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# datasets (downloaded automatically; see README)
+data/raw/
+data/external/
+data/interim/
+data/processed/
+!data/annotations/
+
+# generated artefacts (regenerate with `python -m aipa.pipeline`)
+outputs/
