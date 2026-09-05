@@ -16,6 +16,7 @@ from .data import (
     download_dataset,
     genre_frame,
     load_dataset,
+    needs_download,
     per_seeker_frame,
     validate_dataset,
 )
@@ -98,7 +99,7 @@ def run_all(run_mode: str | None = None, verbose: bool = True, clean_outputs: bo
     if clean_outputs:
         shutil.rmtree(cfg.path("output_path"), ignore_errors=True)
     print(dataset_status(cfg).to_string())
-    if not dataset_status(cfg).query("source == 'ReDial'").present.all():
+    if needs_download(cfg):
         download_dataset(cfg)
     validate_dataset(cfg)
     ds = load_dataset(cfg)

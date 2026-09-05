@@ -11,6 +11,10 @@
     "output_path": "outputs",
     "embedding_model": "tfidf-svd",
     "text_dim": 64,
+    "encoder_batch_size": 128,
+    "text_cache": true,
+    "embedding_fallback": true,
+    "item_text_genres": true,
     "hidden_dim": 64,
     "learning_rate": 0.003,
     "weight_decay": 1e-05,
@@ -46,13 +50,59 @@
       3
     ],
     "bootstrap_samples": 200,
+    "permutation_samples": 2000,
     "min_history_for_ltp": 3,
+    "conflict_strict_labels": [
+      "Conflict",
+      "Override"
+    ],
+    "disagreement_conf_min": 0.6,
+    "disagreement_js_min": 0.5,
+    "history_buckets": [
+      [
+        "cold",
+        0,
+        2
+      ],
+      [
+        "short",
+        3,
+        9
+      ],
+      [
+        "mid",
+        10,
+        24
+      ],
+      [
+        "long",
+        25,
+        null
+      ]
+    ],
+    "genre_breakdown_top": 8,
     "cf_tau": 0.1,
     "cf_dominance": 1.5,
     "persistence_k": 2,
     "persistence_gain": 0.3,
+    "persistence_k_grid": [
+      1,
+      2,
+      3
+    ],
+    "persistence_min_sessions": 3,
+    "criteria_alpha": 0.05,
+    "criteria_macro_f1_min": 0.5,
+    "criteria_conflict_f1_min": 0.5,
+    "criteria_clarification_precision_min": 0.5,
+    "criteria_unnecessary_clarification_max": 0.1,
     "lambda_rel": 0.5,
     "lambda_act": 0.3,
+    "sasrec_blocks": 2,
+    "sasrec_heads": 2,
+    "sasrec_dropout": 0.1,
+    "kbrd_pooling": "attention",
+    "disabled_models": [],
     "n_case_studies": 12,
     "num_workers": 0,
     "subset_fraction": 0.25
@@ -71,20 +121,36 @@
     "scipy": "1.18.1",
     "matplotlib": "3.11.1",
     "seaborn": "0.13.2",
-    "pyyaml": "6.0.3"
+    "pyyaml": "6.0.3",
+    "sentence-transformers": "5.7.0",
+    "transformers": "5.16.1"
   },
   "status": {
     "human_verified_labels": "NOT RUN (no data/annotations/human_verified.csv provided)"
+  },
+  "text_encoder": {
+    "requested": "tfidf-svd",
+    "name": "tfidf-svd",
+    "dim": 64,
+    "pretrained": false,
+    "fallback_reason": null,
+    "batch_size": null,
+    "encode_seconds": 1.17,
+    "n_newly_encoded": 0,
+    "n_cache_hits": 0,
+    "cache_size": null,
+    "cache_path": null
   },
   "dataset_source": "https://github.com/ReDialData/website/raw/data/redial_dataset.zip ; genres: https://files.grouplens.org/datasets/movielens/ml-latest.zip",
   "file_hashes": {
     "train_data.jsonl": "9beae850d90b7c12dcc26b2ac051ed0e355c2c17",
     "test_data.jsonl": "b56f0121828a6423186b02779af9e01424bae5ea",
-    "movies_with_mentions.csv": "14006c0c2368e6686c441c2cd7a19e20e2e23a83"
+    "movies_with_mentions.csv": "14006c0c2368e6686c441c2cd7a19e20e2e23a83",
+    "movies.csv": "20d8b843217b613669b0a8ab3d938823002956d2"
   },
   "n_train": 9281,
   "n_valid": 853,
   "n_test": 1202,
-  "runtime_s": 103.00810287900003,
-  "timestamp_utc": "2026-09-05T09:16:46.123660+00:00"
+  "runtime_s": 161.12986057200033,
+  "timestamp_utc": "2026-09-05T11:47:36.510852+00:00"
 }

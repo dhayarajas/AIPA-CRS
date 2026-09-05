@@ -48,8 +48,10 @@ and reports source/version in the report. MovieLens genres are required: they dr
 LTP/STI genre signals and the relationship labels, so the pipeline stops with a clear error
 when `movies.csv` is missing rather than silently producing an empty conflict subset. If the
 GroupLens TLS check fails (expired certificate or a wrong system clock) the download is retried
-without verification and a warning is printed. After adding the file by hand, delete
-`data/interim/` and `data/processed/` so cached genre-less features are rebuilt.
+without verification, the extracted file's header is checked and its SHA-1 is printed and
+recorded in the report so a run can be matched against the published GroupLens file. Parsed
+and processed caches are keyed by the SHA-1 of all four input files, so adding or replacing
+`movies.csv` rebuilds them automatically.
 
 ### Text encoder (`embedding_model`)
 

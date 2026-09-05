@@ -1,0 +1,5 @@
+| subset                    |    n |   n_seekers |   persistence_k |   n_shifts_mean |   hit10_full |   hit10_without |   mean_diff |   t_p |   wilcoxon_p |   perm_p |   n_pairs |
+|:--------------------------|-----:|------------:|----------------:|----------------:|-------------:|----------------:|------------:|------:|-------------:|---------:|----------:|
+| natural                   | 1077 |          57 |               2 |               6 |    0.0928505 |       0.0928505 |           0 |   nan |          nan |      nan |      2154 |
+| seekers_with_ge3_sessions |  946 |          29 |               2 |               6 |    0.0951374 |       0.0951374 |           0 |   nan |          nan |      nan |      1892 |
+| tracker_affected          |   87 |           8 |               2 |               6 |    0.109195  |       0.109195  |           0 |   nan |          nan |      nan |       174 |

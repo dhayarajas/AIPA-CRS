@@ -74,12 +74,12 @@ M("""
 The loader checks for local files, downloads ReDial (and MovieLens genres) if missing, validates sizes / hashes, caches the parsed corpus and reports source + version + hash. If the download is impossible the cell raises a clear error instead of silently substituting data.
 """)
 C("""
-from aipa.data import dataset_status, download_dataset, validate_dataset, load_dataset, dataset_statistics, per_seeker_frame, genre_frame, dialogue_frame, utterance_frame
+from aipa.data import dataset_status, download_dataset, needs_download, validate_dataset, load_dataset, dataset_statistics, per_seeker_frame, genre_frame, dialogue_frame, utterance_frame
 status = dataset_status(cfg); display(status)
-if not status.query("source == 'ReDial'").present.all():
+if needs_download(cfg):
     ok = download_dataset(cfg)
     if not ok:
-        raise RuntimeError("ReDial could not be downloaded; place redial_dataset.zip under data/raw/redial/ and re-run.")
+        raise RuntimeError("A dataset file could not be downloaded; see the messages above. Place redial_dataset.zip under data/raw/redial/ and/or movies.csv under data/external/ml-latest/, then re-run.")
 display(validate_dataset(cfg))
 ds = load_dataset(cfg)
 print("source:", ds.source)

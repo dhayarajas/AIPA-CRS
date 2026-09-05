@@ -1,17 +1,150 @@
 <!doctype html><html><head><meta charset='utf-8'><title>AIPA-CRS Experimental Report</title><style>body{font-family:Helvetica,Arial,sans-serif;max-width:1100px;margin:2em auto;padding:0 1em;line-height:1.45}table{border-collapse:collapse;font-size:12px;margin:1em 0}td,th{border:1px solid #ccc;padding:3px 6px}th{background:#f0f0f0}img{max-width:100%}blockquote{border-left:4px solid #c66;padding-left:1em;color:#444}</style></head><body><h1>AIPA-CRS: Experimental Report</h1>
-<p><em>Automatically generated. Run mode: <strong>quick</strong>; seeds: [42, 7]; generated 2026-09-05 09:16 UTC.</em></p>
+<p><em>Automatically generated. Run mode: <strong>quick</strong>; seeds: [42, 7]; generated 2026-09-05 11:47 UTC.</em></p>
 <blockquote>
-<p><strong>Scope statement.</strong> This is a research prototype evaluated on ReDial with derived (weak-rule) and controlled synthetic relationship labels. ReDial carries no native intent/preference relationship annotation; no human-verified labels were available for this run unless stated in Section 2. Counterfactual analyses are model-based interventions and must not be read as causal effects in the population. Approximate baselines are re-implementations, not reproductions of MRGE, DiffLSRec or any other published system.</p>
+<p><strong>Scope statement.</strong> This is a research prototype evaluated on ReDial with derived (weak-rule) and controlled synthetic relationship labels. ReDial carries no native intent/preference relationship annotation; no human-verified labels were available for this run unless stated in Section 2. Counterfactual analyses are model-based interventions and must not be read as causal effects in the population. Approximate baselines are re-implementations, not reproductions of MRGE, DiffLSRec or any other published system; SASRec and KBRD-style are re-implementations on ReDial inputs (KBRD-style without the external knowledge graph), not the original code.</p>
 </blockquote>
 <h2>1. Research question and hypotheses</h2>
 <p><strong>RQ.</strong> Does explicit intent-preference arbitration help specifically when current short-term intent (STI) conflicts with historical long-term preference (LTP)?</p>
 <ul>
-<li><strong>H1</strong> - AIPA (full) improves ranking quality over LTP-only, STI-only and naive fusion on the overall natural test set.</li>
+<li><strong>H1</strong> - AIPA (full) improves ranking quality over the baselines (LTP-only, STI-only, fusion, GRU, conversation-aware, SASRec, KBRD-style) on the overall natural test set.</li>
 <li><strong>H2</strong> - The gain is concentrated on Conflict/Override instances (natural weak-labelled subset and controlled synthetic subset).</li>
 <li><strong>H3</strong> - Removing the relationship classifier, the counterfactual diagnostic, clarification or temporal persistence degrades performance.</li>
 <li><strong>H4</strong> - The relationship classifier recovers reference labels above chance and is reasonably calibrated.</li>
 </ul>
-<p>Decision rule: a hypothesis is <em>supported</em> when the paired Wilcoxon test (Holm-corrected within a table) on per-instance Hit@10 gives p &lt; 0.05 in the hypothesised direction; <em>contradicted</em> when p &lt; 0.05 in the opposite direction; otherwise <em>not supported</em>. Where a comparison could not be computed it is reported as NOT RUN.</p>
+<p>Decision rule: a hypothesis is <em>supported</em> when the paired Wilcoxon test (Holm-corrected within a table) on per-instance Hit@10 gives p &lt; 0.05 in the hypothesised direction; <em>contradicted</em> when p &lt; 0.05 in the opposite direction; otherwise <em>not supported</em>. Where a comparison could not be computed it is reported as NOT RUN. Paired differences are formed per instance <em>within</em> each seed and pooled over seeds (n = instances x seeds); a paired t-test and a sign-flip permutation test are reported alongside Wilcoxon, together with Cohen's d and Cliff's delta.</p>
+<h3>Success criteria (computed automatically from <code>outputs/results/success_criteria.csv</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>id</th>
+<th>hypothesis</th>
+<th>criterion</th>
+<th>value</th>
+<th>threshold</th>
+<th>met</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td>H1: AIPA (full) beats the best baseline on natural Hit@10</td>
+<td>Hit@10 gain vs KBRD-style &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0065</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=1, n=1077</td>
+</tr>
+<tr>
+<td>H2-strict</td>
+<td>H2: AIPA (full) beats the best baseline on natural conflict (strict) Hit@10</td>
+<td>gain vs KBRD-style &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0323</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=1, n=62</td>
+</tr>
+<tr>
+<td>H2-broad</td>
+<td>H2: AIPA (full) beats the best baseline on natural conflict (broad) Hit@10</td>
+<td>gain vs KBRD-style &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0254</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=0.355, n=256</td>
+</tr>
+<tr>
+<td>H3</td>
+<td>H3: AIPA (full) beats the best baseline on synthetic conflict Hit@10</td>
+<td>gain vs KBRD-style &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0513</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=1, n=78 (synthetic, reported separately)</td>
+</tr>
+<tr>
+<td>REL-macroF1</td>
+<td>Relationship classifier (natural, weak-rule reference)</td>
+<td>macro-F1 &gt;= 0.5</td>
+<td>0.5512</td>
+<td>&gt;= 0.5</td>
+<td>met</td>
+<td>reference labels are weak-rule labels, not human labels</td>
+</tr>
+<tr>
+<td>REL-ConflictF1</td>
+<td>Relationship classifier (natural, weak-rule reference)</td>
+<td>Conflict-F1 &gt;= 0.5</td>
+<td>0.2371</td>
+<td>&gt;= 0.5</td>
+<td>not met</td>
+<td></td>
+</tr>
+<tr>
+<td>ARB-precision</td>
+<td>Arbitration: clarification precision (natural)</td>
+<td>&gt;= 0.5</td>
+<td>0.9908</td>
+<td>&gt;= 0.5</td>
+<td>met</td>
+<td></td>
+</tr>
+<tr>
+<td>ARB-unnecessary</td>
+<td>Arbitration: unnecessary clarification rate (natural)</td>
+<td>&lt;= 0.1</td>
+<td>0.0019</td>
+<td>&lt;= 0.1</td>
+<td>met</td>
+<td></td>
+</tr>
+<tr>
+<td>ABL-relationship</td>
+<td>Ablation: removing relationship hurts natural Hit@10</td>
+<td>AIPA (full) - AIPA w/o relationship &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0116</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=0.274</td>
+</tr>
+<tr>
+<td>ABL-counterfactual</td>
+<td>Ablation: removing counterfactual hurts natural Hit@10</td>
+<td>AIPA (full) - AIPA w/o counterfactual &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>-0.0097</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=0.576</td>
+</tr>
+<tr>
+<td>ABL-clarification</td>
+<td>Ablation: removing clarification hurts natural Hit@10</td>
+<td>AIPA (full) - AIPA w/o clarification &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>0.0028</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=0.801</td>
+</tr>
+<tr>
+<td>ABL-persistence</td>
+<td>Ablation: removing persistence hurts natural Hit@10</td>
+<td>AIPA (full) - AIPA w/o persistence &gt; 0 and Holm perm p &lt; 0.05</td>
+<td>0.0000</td>
+<td>&gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>p_holm=nan</td>
+</tr>
+<tr>
+<td>ABL-persistence-affected</td>
+<td>Persistence tracker changes Hit@10 on the instances it affected</td>
+<td>n &gt; 0, gain &gt; 0 and perm p &lt; 0.05</td>
+<td>0.0000</td>
+<td>n &gt; 0, p &lt; 0.05</td>
+<td>not met</td>
+<td>n_affected=87, shifts/seed=6.0</td>
+</tr>
+</tbody>
+</table>
 <h2>2. Data, labels and preprocessing</h2>
 <p>Dataset: <strong>ReDial</strong> (English conversational movie recommendation), source <code>https://github.com/ReDialData/website/raw/data/redial_dataset.zip ; genres: https://files.grouplens.org/datasets/movielens/ml-latest.zip</code>. Item genres are joined from MovieLens <code>ml-latest</code> by normalised title + year (items without a match have empty genre lists).</p>
 <table>
@@ -163,110 +296,128 @@
 <tr>
 <td>LTP-only</td>
 <td>1077</td>
-<td>0.052 ± 0.002 [0.044, 0.062]</td>
-<td>0.029 ± 0.001 [0.025, 0.036]</td>
-<td>0.023 ± 0.001 [0.018, 0.028]</td>
-<td>0.077 ± 0.004 [0.066, 0.089]</td>
-<td>0.036 ± 0.002 [0.031, 0.042]</td>
+<td>0.053 ± 0.002 [0.045, 0.063]</td>
+<td>0.030 ± 0.001 [0.025, 0.037]</td>
+<td>0.023 ± 0.000 [0.018, 0.029]</td>
+<td>0.083 ± 0.002 [0.073, 0.097]</td>
+<td>0.037 ± 0.001 [0.032, 0.043]</td>
 </tr>
 <tr>
 <td>STI-only</td>
 <td>1077</td>
-<td>0.101 ± 0.003 [0.089, 0.113]</td>
-<td>0.053 ± 0.004 [0.046, 0.061]</td>
-<td>0.039 ± 0.004 [0.033, 0.046]</td>
-<td>0.147 ± 0.006 [0.133, 0.163]</td>
-<td>0.065 ± 0.004 [0.059, 0.073]</td>
+<td>0.097 ± 0.003 [0.084, 0.109]</td>
+<td>0.052 ± 0.001 [0.046, 0.060]</td>
+<td>0.039 ± 0.002 [0.033, 0.045]</td>
+<td>0.136 ± 0.002 [0.121, 0.150]</td>
+<td>0.062 ± 0.001 [0.055, 0.069]</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
 <td>1077</td>
-<td>0.087 ± 0.007 [0.078, 0.099]</td>
-<td>0.048 ± 0.005 [0.042, 0.056]</td>
-<td>0.036 ± 0.004 [0.030, 0.042]</td>
-<td>0.132 ± 0.001 [0.120, 0.146]</td>
-<td>0.059 ± 0.003 [0.053, 0.067]</td>
+<td>0.092 ± 0.005 [0.078, 0.104]</td>
+<td>0.050 ± 0.003 [0.043, 0.057]</td>
+<td>0.037 ± 0.003 [0.031, 0.043]</td>
+<td>0.132 ± 0.000 [0.120, 0.146]</td>
+<td>0.060 ± 0.002 [0.053, 0.067]</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
 <td>1077</td>
-<td>0.091 ± 0.001 [0.081, 0.104]</td>
-<td>0.051 ± 0.000 [0.045, 0.058]</td>
-<td>0.039 ± 0.001 [0.033, 0.045]</td>
-<td>0.134 ± 0.001 [0.121, 0.150]</td>
-<td>0.062 ± 0.001 [0.055, 0.070]</td>
+<td>0.094 ± 0.002 [0.082, 0.106]</td>
+<td>0.053 ± 0.001 [0.046, 0.061]</td>
+<td>0.041 ± 0.000 [0.034, 0.048]</td>
+<td>0.136 ± 0.001 [0.124, 0.150]</td>
+<td>0.064 ± 0.000 [0.056, 0.072]</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
 <td>1077</td>
-<td>0.064 ± 0.000 [0.054, 0.074]</td>
-<td>0.037 ± 0.001 [0.031, 0.044]</td>
-<td>0.029 ± 0.001 [0.023, 0.035]</td>
-<td>0.103 ± 0.001 [0.088, 0.115]</td>
-<td>0.047 ± 0.001 [0.040, 0.055]</td>
+<td>0.066 ± 0.005 [0.057, 0.077]</td>
+<td>0.037 ± 0.001 [0.032, 0.044]</td>
+<td>0.028 ± 0.002 [0.023, 0.034]</td>
+<td>0.094 ± 0.007 [0.083, 0.106]</td>
+<td>0.044 ± 0.000 [0.038, 0.051]</td>
 </tr>
 <tr>
 <td>Conversation-aware</td>
 <td>1077</td>
-<td>0.076 ± 0.001 [0.066, 0.085]</td>
-<td>0.045 ± 0.001 [0.039, 0.051]</td>
-<td>0.036 ± 0.000 [0.030, 0.042]</td>
-<td>0.122 ± 0.002 [0.109, 0.134]</td>
-<td>0.057 ± 0.000 [0.049, 0.064]</td>
+<td>0.078 ± 0.001 [0.067, 0.088]</td>
+<td>0.043 ± 0.001 [0.036, 0.050]</td>
+<td>0.032 ± 0.001 [0.026, 0.039]</td>
+<td>0.108 ± 0.000 [0.095, 0.120]</td>
+<td>0.051 ± 0.001 [0.044, 0.058]</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>1077</td>
+<td>0.058 ± 0.002 [0.051, 0.067]</td>
+<td>0.031 ± 0.002 [0.027, 0.037]</td>
+<td>0.023 ± 0.003 [0.019, 0.028]</td>
+<td>0.083 ± 0.005 [0.073, 0.093]</td>
+<td>0.037 ± 0.001 [0.032, 0.044]</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>1077</td>
+<td>0.099 ± 0.002 [0.088, 0.111]</td>
+<td>0.052 ± 0.000 [0.045, 0.058]</td>
+<td>0.038 ± 0.001 [0.032, 0.043]</td>
+<td>0.154 ± 0.001 [0.140, 0.166]</td>
+<td>0.066 ± 0.000 [0.058, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>1077</td>
-<td>0.100 ± 0.001 [0.089, 0.115]</td>
-<td>0.056 ± 0.000 [0.048, 0.065]</td>
-<td>0.043 ± 0.000 [0.036, 0.051]</td>
-<td>0.143 ± 0.004 [0.128, 0.157]</td>
-<td>0.067 ± 0.001 [0.059, 0.075]</td>
+<td>0.104 ± 0.002 [0.093, 0.117]</td>
+<td>0.054 ± 0.002 [0.047, 0.062]</td>
+<td>0.039 ± 0.002 [0.033, 0.045]</td>
+<td>0.145 ± 0.003 [0.130, 0.158]</td>
+<td>0.065 ± 0.002 [0.057, 0.071]</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>1077</td>
-<td>0.094 ± 0.005 [0.084, 0.105]</td>
-<td>0.052 ± 0.004 [0.045, 0.060]</td>
-<td>0.039 ± 0.003 [0.033, 0.045]</td>
-<td>0.141 ± 0.003 [0.127, 0.155]</td>
-<td>0.064 ± 0.003 [0.056, 0.071]</td>
+<td>0.103 ± 0.002 [0.091, 0.116]</td>
+<td>0.053 ± 0.002 [0.046, 0.061]</td>
+<td>0.039 ± 0.002 [0.033, 0.044]</td>
+<td>0.145 ± 0.000 [0.131, 0.159]</td>
+<td>0.064 ± 0.001 [0.057, 0.071]</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>1077</td>
-<td>0.089 ± 0.003 [0.078, 0.101]</td>
-<td>0.049 ± 0.003 [0.042, 0.056]</td>
-<td>0.037 ± 0.003 [0.031, 0.044]</td>
-<td>0.126 ± 0.003 [0.114, 0.138]</td>
-<td>0.058 ± 0.003 [0.051, 0.066]</td>
+<td>0.090 ± 0.001 [0.079, 0.104]</td>
+<td>0.051 ± 0.000 [0.043, 0.059]</td>
+<td>0.039 ± 0.000 [0.033, 0.046]</td>
+<td>0.135 ± 0.006 [0.120, 0.150]</td>
+<td>0.062 ± 0.001 [0.055, 0.071]</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
 <td>1077</td>
-<td>0.089 ± 0.000 [0.078, 0.101]</td>
-<td>0.051 ± 0.000 [0.044, 0.059]</td>
-<td>0.040 ± 0.001 [0.034, 0.048]</td>
-<td>0.141 ± 0.008 [0.126, 0.154]</td>
-<td>0.064 ± 0.002 [0.057, 0.073]</td>
+<td>0.093 ± 0.000 [0.082, 0.107]</td>
+<td>0.052 ± 0.000 [0.045, 0.060]</td>
+<td>0.040 ± 0.001 [0.034, 0.047]</td>
+<td>0.137 ± 0.006 [0.122, 0.153]</td>
+<td>0.064 ± 0.002 [0.056, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>1077</td>
-<td>0.085 ± 0.005 [0.074, 0.097]</td>
-<td>0.046 ± 0.003 [0.040, 0.054]</td>
-<td>0.035 ± 0.002 [0.029, 0.041]</td>
-<td>0.126 ± 0.004 [0.115, 0.138]</td>
-<td>0.057 ± 0.002 [0.050, 0.064]</td>
+<td>0.088 ± 0.005 [0.077, 0.100]</td>
+<td>0.051 ± 0.002 [0.044, 0.058]</td>
+<td>0.039 ± 0.002 [0.033, 0.047]</td>
+<td>0.134 ± 0.003 [0.119, 0.149]</td>
+<td>0.062 ± 0.002 [0.055, 0.070]</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>1077</td>
-<td>0.089 ± 0.000 [0.078, 0.101]</td>
-<td>0.051 ± 0.001 [0.044, 0.059]</td>
-<td>0.040 ± 0.001 [0.034, 0.048]</td>
-<td>0.141 ± 0.007 [0.127, 0.155]</td>
-<td>0.064 ± 0.002 [0.057, 0.073]</td>
+<td>0.093 ± 0.000 [0.082, 0.107]</td>
+<td>0.053 ± 0.000 [0.045, 0.060]</td>
+<td>0.040 ± 0.001 [0.034, 0.047]</td>
+<td>0.136 ± 0.006 [0.120, 0.152]</td>
+<td>0.063 ± 0.002 [0.055, 0.072]</td>
 </tr>
 </tbody>
 </table>
@@ -277,11 +428,16 @@
 <tr>
 <th>control</th>
 <th>n</th>
+<th>n_samples</th>
+<th>n_seeds</th>
 <th>mean_diff</th>
+<th>seed_std_diff</th>
 <th>t_p</th>
 <th>t_p_holm</th>
 <th>wilcoxon_p</th>
 <th>wilcoxon_p_holm</th>
+<th>perm_p</th>
+<th>perm_p_holm</th>
 <th>cohen_d</th>
 <th>cliffs_delta</th>
 </tr>
@@ -289,41 +445,61 @@
 <tbody>
 <tr>
 <td>AIPA (rule policy)</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0037</td>
-<td>0.4579</td>
+<td>2</td>
+<td>0.0046</td>
+<td>0.0046</td>
+<td>0.3491</td>
 <td>1.0000</td>
-<td>0.7731</td>
+<td>0.6823</td>
 <td>1.0000</td>
-<td>0.0226</td>
-<td>0.0009</td>
+<td>0.4083</td>
+<td>1.0000</td>
+<td>0.0202</td>
+<td>0.0046</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0000</td>
+<td>2</td>
+<td>0.0028</td>
+<td>0.0009</td>
+<td>0.0578</td>
+<td>0.4043</td>
+<td>0.7969</td>
 <td>1.0000</td>
-<td>1.0000</td>
-<td>0.9132</td>
-<td>1.0000</td>
-<td>0.0000</td>
-<td>-0.0061</td>
+<td>0.1144</td>
+<td>0.8011</td>
+<td>0.0409</td>
+<td>0.0028</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
+<td>2154</td>
 <td>1077</td>
-<td>-0.0051</td>
-<td>0.2967</td>
+<td>2</td>
+<td>-0.0097</td>
+<td>0.0023</td>
+<td>0.0502</td>
+<td>0.4014</td>
+<td>0.3902</td>
 <td>1.0000</td>
-<td>0.4368</td>
-<td>1.0000</td>
-<td>-0.0318</td>
-<td>-0.0188</td>
+<td>0.0720</td>
+<td>0.5757</td>
+<td>-0.0422</td>
+<td>-0.0097</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
+<td>2154</td>
 <td>1077</td>
+<td>2</td>
 <td>0.0000</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
@@ -333,209 +509,486 @@
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
+<td>2154</td>
 <td>1077</td>
+<td>2</td>
 <td>-0.0116</td>
-<td>0.0378</td>
-<td>0.3026</td>
-<td>0.1863</td>
+<td>0.0023</td>
+<td>0.0208</td>
+<td>0.1871</td>
+<td>0.3068</td>
 <td>1.0000</td>
-<td>-0.0634</td>
-<td>-0.0181</td>
+<td>0.0305</td>
+<td>0.2744</td>
+<td>-0.0498</td>
+<td>-0.0116</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
+<td>2154</td>
 <td>1077</td>
-<td>-0.0028</td>
-<td>0.5447</td>
+<td>2</td>
+<td>-0.0014</td>
+<td>0.0023</td>
+<td>0.7506</td>
 <td>1.0000</td>
-<td>0.6944</td>
+<td>0.9012</td>
 <td>1.0000</td>
-<td>-0.0185</td>
-<td>-0.0030</td>
+<td>0.8421</td>
+<td>1.0000</td>
+<td>-0.0069</td>
+<td>-0.0014</td>
 </tr>
 <tr>
 <td>Conversation-aware</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0125</td>
-<td>0.0424</td>
-<td>0.3026</td>
-<td>0.4519</td>
+<td>2</td>
+<td>0.0153</td>
+<td>0.0014</td>
+<td>0.0051</td>
+<td>0.0510</td>
+<td>0.1815</td>
 <td>1.0000</td>
-<td>0.0619</td>
-<td>0.0145</td>
+<td>0.0080</td>
+<td>0.0800</td>
+<td>0.0604</td>
+<td>0.0153</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>2154</td>
+<td>1077</td>
+<td>2</td>
+<td>-0.0065</td>
+<td>0.0019</td>
+<td>0.2655</td>
+<td>1.0000</td>
+<td>0.5739</td>
+<td>1.0000</td>
+<td>0.3103</td>
+<td>1.0000</td>
+<td>-0.0240</td>
+<td>-0.0065</td>
 </tr>
 <tr>
 <td>LTP-only</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0371</td>
+<td>2</td>
+<td>0.0399</td>
+<td>0.0019</td>
 <td>0.0000</td>
 <td>0.0000</td>
-<td>0.0003</td>
-<td>0.0036</td>
-<td>0.1796</td>
-<td>0.0502</td>
+<td>0.0006</td>
+<td>0.0073</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.1481</td>
+<td>0.0399</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0019</td>
-<td>0.7196</td>
+<td>2</td>
+<td>0.0005</td>
+<td>0.0051</td>
+<td>0.9237</td>
 <td>1.0000</td>
-<td>0.9661</td>
+<td>0.9673</td>
 <td>1.0000</td>
-<td>0.0109</td>
-<td>-0.0018</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0021</td>
+<td>0.0005</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>2154</td>
+<td>1077</td>
+<td>2</td>
+<td>0.0348</td>
+<td>0.0023</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0027</td>
+<td>0.0326</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.1252</td>
+<td>0.0348</td>
 </tr>
 <tr>
 <td>STI-only</td>
+<td>2154</td>
 <td>1077</td>
-<td>-0.0121</td>
-<td>0.0279</td>
-<td>0.2513</td>
-<td>0.1653</td>
+<td>2</td>
+<td>-0.0037</td>
+<td>0.0028</td>
+<td>0.4726</td>
 <td>1.0000</td>
-<td>-0.0671</td>
-<td>-0.0159</td>
+<td>0.7444</td>
+<td>1.0000</td>
+<td>0.5327</td>
+<td>1.0000</td>
+<td>-0.0155</td>
+<td>-0.0037</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
+<td>2154</td>
 <td>1077</td>
-<td>0.0251</td>
-<td>0.0001</td>
-<td>0.0011</td>
-<td>0.0444</td>
-<td>0.4437</td>
-<td>0.1183</td>
-<td>0.0282</td>
+<td>2</td>
+<td>0.0269</td>
+<td>0.0046</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0197</td>
+<td>0.2171</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.1005</td>
+<td>0.0269</td>
 </tr>
 </tbody>
 </table>
 <h2>4. Conflict-sensitive evaluation</h2>
-<h3>4.1 Natural Conflict/Override subset (weak-rule labels; noisy)</h3>
+<p>Two natural subsets are evaluated: <strong>strict</strong> = weak-rule label in Conflict/Override; <strong>broad</strong> (disagreement) = strict OR (weak-rule confidence &gt;= 0.6 AND Jensen-Shannon divergence between the LTP and STI genre distributions &gt;= 0.5). Both rely on weak-rule labels, not human labels.</p>
 <table>
 <thead>
 <tr>
-<th>model</th>
+<th>subset</th>
+<th>definition</th>
 <th>n</th>
-<th>Hit@10</th>
-<th>NDCG@10</th>
-<th>MRR@10</th>
-<th>Hit@20</th>
-<th>NDCG@20</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>LTP-only</td>
+<td>strict</td>
+<td>weak-rule label in Conflict/Override</td>
 <td>62</td>
-<td>0.016 ± 0.016 [0.000, 0.040]</td>
-<td>0.013 ± 0.013 [0.000, 0.029]</td>
-<td>0.012 ± 0.012 [0.000, 0.028]</td>
-<td>0.032 ± 0.016 [0.008, 0.065]</td>
-<td>0.017 ± 0.013 [0.002, 0.038]</td>
 </tr>
 <tr>
-<td>STI-only</td>
-<td>62</td>
-<td>0.113 ± 0.016 [0.056, 0.177]</td>
-<td>0.046 ± 0.000 [0.022, 0.075]</td>
-<td>0.026 ± 0.005 [0.011, 0.048]</td>
-<td>0.210 ± 0.016 [0.145, 0.274]</td>
-<td>0.069 ± 0.000 [0.046, 0.099]</td>
+<td>broad</td>
+<td>Conflict/Override or (confidence &gt;= 0.6 and JS(ltp, sti) &gt;= 0.5)</td>
+<td>256</td>
 </tr>
 <tr>
-<td>Naive fusion</td>
-<td>62</td>
-<td>0.065 ± 0.016 [0.024, 0.113]</td>
-<td>0.036 ± 0.002 [0.013, 0.065]</td>
-<td>0.026 ± 0.002 [0.007, 0.051]</td>
-<td>0.129 ± 0.000 [0.073, 0.185]</td>
-<td>0.052 ± 0.001 [0.027, 0.084]</td>
+<td>broad_only</td>
+<td>broad minus strict</td>
+<td>194</td>
 </tr>
 <tr>
-<td>Adaptive fusion</td>
-<td>62</td>
-<td>0.048 ± 0.000 [0.016, 0.089]</td>
-<td>0.019 ± 0.001 [0.006, 0.036]</td>
-<td>0.010 ± 0.001 [0.003, 0.020]</td>
-<td>0.129 ± 0.016 [0.080, 0.186]</td>
-<td>0.040 ± 0.005 [0.024, 0.063]</td>
+<td>synthetic_conflict</td>
+<td>synthetic Conflict/Override</td>
+<td>78</td>
 </tr>
 <tr>
-<td>Sequential (GRU)</td>
-<td>62</td>
-<td>0.032 ± 0.032 [0.008, 0.073]</td>
-<td>0.017 ± 0.017 [0.003, 0.036]</td>
-<td>0.013 ± 0.013 [0.001, 0.028]</td>
-<td>0.065 ± 0.048 [0.024, 0.113]</td>
-<td>0.025 ± 0.021 [0.008, 0.046]</td>
-</tr>
-<tr>
-<td>Conversation-aware</td>
-<td>62</td>
-<td>0.073 ± 0.024 [0.024, 0.113]</td>
-<td>0.040 ± 0.017 [0.014, 0.072]</td>
-<td>0.030 ± 0.015 [0.008, 0.061]</td>
-<td>0.137 ± 0.056 [0.089, 0.202]</td>
-<td>0.057 ± 0.026 [0.030, 0.086]</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>62</td>
-<td>0.113 ± 0.016 [0.056, 0.177]</td>
-<td>0.052 ± 0.012 [0.026, 0.085]</td>
-<td>0.033 ± 0.011 [0.015, 0.060]</td>
-<td>0.161 ± 0.016 [0.105, 0.234]</td>
-<td>0.064 ± 0.012 [0.036, 0.098]</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>62</td>
-<td>0.105 ± 0.024 [0.048, 0.161]</td>
-<td>0.052 ± 0.011 [0.022, 0.086]</td>
-<td>0.036 ± 0.008 [0.015, 0.066]</td>
-<td>0.161 ± 0.016 [0.105, 0.226]</td>
-<td>0.066 ± 0.009 [0.038, 0.104]</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>62</td>
-<td>0.105 ± 0.008 [0.056, 0.161]</td>
-<td>0.053 ± 0.000 [0.023, 0.089]</td>
-<td>0.038 ± 0.003 [0.014, 0.070]</td>
-<td>0.153 ± 0.040 [0.105, 0.218]</td>
-<td>0.065 ± 0.007 [0.037, 0.103]</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>62</td>
-<td>0.056 ± 0.008 [0.016, 0.105]</td>
-<td>0.033 ± 0.005 [0.011, 0.063]</td>
-<td>0.026 ± 0.004 [0.007, 0.050]</td>
-<td>0.153 ± 0.008 [0.097, 0.218]</td>
-<td>0.058 ± 0.004 [0.032, 0.089]</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>62</td>
-<td>0.073 ± 0.008 [0.032, 0.129]</td>
-<td>0.040 ± 0.004 [0.016, 0.072]</td>
-<td>0.029 ± 0.004 [0.011, 0.053]</td>
-<td>0.137 ± 0.008 [0.089, 0.202]</td>
-<td>0.056 ± 0.000 [0.031, 0.088]</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>62</td>
-<td>0.056 ± 0.008 [0.016, 0.105]</td>
-<td>0.033 ± 0.005 [0.011, 0.063]</td>
-<td>0.026 ± 0.004 [0.007, 0.050]</td>
-<td>0.153 ± 0.008 [0.097, 0.218]</td>
-<td>0.058 ± 0.004 [0.032, 0.089]</td>
+<td>natural</td>
+<td>all natural test instances</td>
+<td>1077</td>
 </tr>
 </tbody>
 </table>
-<h3>4.2 Natural non-conflict subset</h3>
+<h3>4.1 Natural conflict subsets (weak-rule labels; noisy)</h3>
+<table>
+<thead>
+<tr>
+<th>subset</th>
+<th>model</th>
+<th>n</th>
+<th>Hit@10</th>
+<th>NDCG@10</th>
+<th>MRR@10</th>
+<th>Hit@20</th>
+<th>NDCG@20</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>strict</td>
+<td>LTP-only</td>
+<td>62</td>
+<td>0.016 ± 0.016 [0.000, 0.040]</td>
+<td>0.007 ± 0.007 [0.000, 0.015]</td>
+<td>0.004 ± 0.004 [0.000, 0.009]</td>
+<td>0.048 ± 0.016 [0.016, 0.089]</td>
+<td>0.015 ± 0.006 [0.004, 0.027]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>STI-only</td>
+<td>62</td>
+<td>0.065 ± 0.000 [0.024, 0.113]</td>
+<td>0.029 ± 0.007 [0.011, 0.056]</td>
+<td>0.019 ± 0.009 [0.005, 0.042]</td>
+<td>0.145 ± 0.016 [0.097, 0.210]</td>
+<td>0.050 ± 0.011 [0.030, 0.081]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>Naive fusion</td>
+<td>62</td>
+<td>0.065 ± 0.000 [0.016, 0.121]</td>
+<td>0.039 ± 0.001 [0.012, 0.077]</td>
+<td>0.030 ± 0.001 [0.008, 0.062]</td>
+<td>0.113 ± 0.000 [0.056, 0.170]</td>
+<td>0.051 ± 0.001 [0.022, 0.088]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>Adaptive fusion</td>
+<td>62</td>
+<td>0.081 ± 0.016 [0.040, 0.129]</td>
+<td>0.030 ± 0.004 [0.013, 0.049]</td>
+<td>0.015 ± 0.001 [0.007, 0.026]</td>
+<td>0.097 ± 0.000 [0.048, 0.161]</td>
+<td>0.034 ± 0.000 [0.017, 0.056]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>Sequential (GRU)</td>
+<td>62</td>
+<td>0.040 ± 0.008 [0.008, 0.073]</td>
+<td>0.016 ± 0.004 [0.003, 0.029]</td>
+<td>0.009 ± 0.003 [0.002, 0.017]</td>
+<td>0.081 ± 0.016 [0.032, 0.129]</td>
+<td>0.026 ± 0.006 [0.010, 0.042]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>Conversation-aware</td>
+<td>62</td>
+<td>0.048 ± 0.000 [0.016, 0.081]</td>
+<td>0.024 ± 0.005 [0.006, 0.044]</td>
+<td>0.016 ± 0.007 [0.003, 0.035]</td>
+<td>0.089 ± 0.008 [0.040, 0.137]</td>
+<td>0.034 ± 0.003 [0.014, 0.057]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>SASRec</td>
+<td>62</td>
+<td>0.016 ± 0.000 [0.000, 0.048]</td>
+<td>0.012 ± 0.005 [0.000, 0.030]</td>
+<td>0.010 ± 0.006 [0.000, 0.026]</td>
+<td>0.032 ± 0.000 [0.008, 0.073]</td>
+<td>0.016 ± 0.004 [0.002, 0.035]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>KBRD-style</td>
+<td>62</td>
+<td>0.121 ± 0.008 [0.073, 0.177]</td>
+<td>0.050 ± 0.009 [0.028, 0.076]</td>
+<td>0.029 ± 0.009 [0.014, 0.050]</td>
+<td>0.218 ± 0.008 [0.153, 0.291]</td>
+<td>0.075 ± 0.005 [0.053, 0.107]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA w/o relationship</td>
+<td>62</td>
+<td>0.097 ± 0.032 [0.048, 0.153]</td>
+<td>0.047 ± 0.009 [0.022, 0.080]</td>
+<td>0.032 ± 0.003 [0.012, 0.061]</td>
+<td>0.153 ± 0.024 [0.097, 0.226]</td>
+<td>0.061 ± 0.007 [0.035, 0.097]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA w/o counterfactual</td>
+<td>62</td>
+<td>0.097 ± 0.032 [0.048, 0.153]</td>
+<td>0.047 ± 0.009 [0.022, 0.080]</td>
+<td>0.032 ± 0.003 [0.012, 0.061]</td>
+<td>0.145 ± 0.032 [0.089, 0.210]</td>
+<td>0.059 ± 0.009 [0.031, 0.094]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA w/o clarification</td>
+<td>62</td>
+<td>0.081 ± 0.000 [0.032, 0.137]</td>
+<td>0.047 ± 0.010 [0.019, 0.088]</td>
+<td>0.037 ± 0.014 [0.013, 0.076]</td>
+<td>0.129 ± 0.016 [0.073, 0.202]</td>
+<td>0.059 ± 0.014 [0.032, 0.101]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA w/o persistence</td>
+<td>62</td>
+<td>0.089 ± 0.008 [0.040, 0.145]</td>
+<td>0.052 ± 0.011 [0.024, 0.092]</td>
+<td>0.041 ± 0.017 [0.016, 0.077]</td>
+<td>0.129 ± 0.016 [0.073, 0.202]</td>
+<td>0.062 ± 0.017 [0.034, 0.106]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA (rule policy)</td>
+<td>62</td>
+<td>0.081 ± 0.000 [0.032, 0.129]</td>
+<td>0.054 ± 0.006 [0.021, 0.099]</td>
+<td>0.046 ± 0.008 [0.017, 0.084]</td>
+<td>0.137 ± 0.008 [0.081, 0.210]</td>
+<td>0.068 ± 0.004 [0.035, 0.110]</td>
+</tr>
+<tr>
+<td>strict</td>
+<td>AIPA (full)</td>
+<td>62</td>
+<td>0.089 ± 0.008 [0.040, 0.145]</td>
+<td>0.052 ± 0.011 [0.024, 0.092]</td>
+<td>0.041 ± 0.017 [0.016, 0.077]</td>
+<td>0.129 ± 0.016 [0.073, 0.202]</td>
+<td>0.062 ± 0.017 [0.034, 0.106]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>LTP-only</td>
+<td>256</td>
+<td>0.027 ± 0.004 [0.014, 0.043]</td>
+<td>0.015 ± 0.003 [0.008, 0.025]</td>
+<td>0.012 ± 0.003 [0.006, 0.020]</td>
+<td>0.055 ± 0.004 [0.035, 0.078]</td>
+<td>0.022 ± 0.001 [0.013, 0.033]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>STI-only</td>
+<td>256</td>
+<td>0.092 ± 0.010 [0.068, 0.119]</td>
+<td>0.048 ± 0.009 [0.034, 0.065]</td>
+<td>0.034 ± 0.009 [0.023, 0.051]</td>
+<td>0.139 ± 0.006 [0.111, 0.168]</td>
+<td>0.059 ± 0.009 [0.046, 0.077]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>Naive fusion</td>
+<td>256</td>
+<td>0.076 ± 0.021 [0.055, 0.098]</td>
+<td>0.041 ± 0.016 [0.029, 0.053]</td>
+<td>0.030 ± 0.014 [0.019, 0.041]</td>
+<td>0.119 ± 0.014 [0.092, 0.152]</td>
+<td>0.052 ± 0.014 [0.039, 0.066]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>Adaptive fusion</td>
+<td>256</td>
+<td>0.090 ± 0.012 [0.064, 0.117]</td>
+<td>0.046 ± 0.008 [0.034, 0.063]</td>
+<td>0.033 ± 0.006 [0.024, 0.046]</td>
+<td>0.121 ± 0.008 [0.094, 0.150]</td>
+<td>0.054 ± 0.006 [0.041, 0.070]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>Sequential (GRU)</td>
+<td>256</td>
+<td>0.045 ± 0.006 [0.029, 0.066]</td>
+<td>0.022 ± 0.004 [0.013, 0.032]</td>
+<td>0.015 ± 0.007 [0.008, 0.023]</td>
+<td>0.068 ± 0.006 [0.047, 0.094]</td>
+<td>0.028 ± 0.004 [0.019, 0.039]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>Conversation-aware</td>
+<td>256</td>
+<td>0.062 ± 0.012 [0.043, 0.080]</td>
+<td>0.030 ± 0.009 [0.019, 0.041]</td>
+<td>0.020 ± 0.008 [0.012, 0.029]</td>
+<td>0.104 ± 0.014 [0.078, 0.127]</td>
+<td>0.040 ± 0.010 [0.029, 0.051]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>SASRec</td>
+<td>256</td>
+<td>0.043 ± 0.004 [0.027, 0.064]</td>
+<td>0.024 ± 0.004 [0.014, 0.036]</td>
+<td>0.018 ± 0.003 [0.008, 0.027]</td>
+<td>0.059 ± 0.004 [0.039, 0.082]</td>
+<td>0.028 ± 0.002 [0.017, 0.040]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>KBRD-style</td>
+<td>256</td>
+<td>0.115 ± 0.014 [0.092, 0.145]</td>
+<td>0.057 ± 0.006 [0.044, 0.071]</td>
+<td>0.039 ± 0.004 [0.028, 0.051]</td>
+<td>0.178 ± 0.006 [0.146, 0.209]</td>
+<td>0.072 ± 0.004 [0.058, 0.087]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA w/o relationship</td>
+<td>256</td>
+<td>0.109 ± 0.004 [0.086, 0.137]</td>
+<td>0.057 ± 0.006 [0.042, 0.071]</td>
+<td>0.040 ± 0.008 [0.029, 0.054]</td>
+<td>0.154 ± 0.006 [0.125, 0.186]</td>
+<td>0.068 ± 0.005 [0.053, 0.083]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA w/o counterfactual</td>
+<td>256</td>
+<td>0.105 ± 0.004 [0.076, 0.133]</td>
+<td>0.054 ± 0.004 [0.039, 0.069]</td>
+<td>0.039 ± 0.006 [0.027, 0.052]</td>
+<td>0.150 ± 0.002 [0.123, 0.182]</td>
+<td>0.066 ± 0.006 [0.051, 0.080]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA w/o clarification</td>
+<td>256</td>
+<td>0.088 ± 0.014 [0.059, 0.117]</td>
+<td>0.047 ± 0.013 [0.030, 0.063]</td>
+<td>0.034 ± 0.012 [0.022, 0.047]</td>
+<td>0.141 ± 0.012 [0.109, 0.174]</td>
+<td>0.060 ± 0.012 [0.046, 0.076]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA w/o persistence</td>
+<td>256</td>
+<td>0.090 ± 0.008 [0.062, 0.117]</td>
+<td>0.051 ± 0.012 [0.033, 0.067]</td>
+<td>0.039 ± 0.014 [0.026, 0.053]</td>
+<td>0.141 ± 0.012 [0.109, 0.174]</td>
+<td>0.063 ± 0.013 [0.048, 0.079]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA (rule policy)</td>
+<td>256</td>
+<td>0.088 ± 0.002 [0.066, 0.113]</td>
+<td>0.047 ± 0.003 [0.033, 0.061]</td>
+<td>0.035 ± 0.004 [0.023, 0.047]</td>
+<td>0.127 ± 0.014 [0.102, 0.158]</td>
+<td>0.057 ± 0.006 [0.042, 0.073]</td>
+</tr>
+<tr>
+<td>broad</td>
+<td>AIPA (full)</td>
+<td>256</td>
+<td>0.090 ± 0.008 [0.062, 0.117]</td>
+<td>0.051 ± 0.012 [0.033, 0.067]</td>
+<td>0.039 ± 0.014 [0.026, 0.053]</td>
+<td>0.139 ± 0.010 [0.109, 0.170]</td>
+<td>0.063 ± 0.013 [0.048, 0.079]</td>
+</tr>
+</tbody>
+</table>
+<h3>4.2 Natural non-disagreement subset (complement of the broad subset)</h3>
 <table>
 <thead>
 <tr>
@@ -551,111 +1004,129 @@
 <tbody>
 <tr>
 <td>LTP-only</td>
-<td>1015</td>
-<td>0.054 ± 0.003 [0.043, 0.063]</td>
-<td>0.030 ± 0.002 [0.025, 0.037]</td>
-<td>0.023 ± 0.002 [0.018, 0.029]</td>
-<td>0.080 ± 0.005 [0.070, 0.091]</td>
-<td>0.037 ± 0.002 [0.032, 0.043]</td>
+<td>821</td>
+<td>0.061 ± 0.004 [0.050, 0.072]</td>
+<td>0.034 ± 0.002 [0.029, 0.042]</td>
+<td>0.026 ± 0.002 [0.021, 0.034]</td>
+<td>0.092 ± 0.002 [0.077, 0.105]</td>
+<td>0.042 ± 0.002 [0.037, 0.051]</td>
 </tr>
 <tr>
 <td>STI-only</td>
-<td>1015</td>
-<td>0.100 ± 0.002 [0.087, 0.113]</td>
-<td>0.054 ± 0.004 [0.046, 0.062]</td>
-<td>0.040 ± 0.004 [0.034, 0.046]</td>
-<td>0.143 ± 0.005 [0.129, 0.159]</td>
-<td>0.065 ± 0.005 [0.057, 0.073]</td>
+<td>821</td>
+<td>0.098 ± 0.007 [0.085, 0.112]</td>
+<td>0.054 ± 0.002 [0.045, 0.061]</td>
+<td>0.040 ± 0.000 [0.033, 0.047]</td>
+<td>0.135 ± 0.004 [0.118, 0.151]</td>
+<td>0.063 ± 0.001 [0.054, 0.070]</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
-<td>1015</td>
-<td>0.088 ± 0.006 [0.076, 0.101]</td>
-<td>0.048 ± 0.005 [0.041, 0.056]</td>
-<td>0.036 ± 0.004 [0.030, 0.044]</td>
-<td>0.132 ± 0.001 [0.119, 0.147]</td>
-<td>0.059 ± 0.003 [0.052, 0.068]</td>
+<td>821</td>
+<td>0.097 ± 0.000 [0.082, 0.110]</td>
+<td>0.053 ± 0.001 [0.044, 0.061]</td>
+<td>0.039 ± 0.001 [0.031, 0.047]</td>
+<td>0.136 ± 0.004 [0.119, 0.153]</td>
+<td>0.062 ± 0.002 [0.053, 0.070]</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
-<td>1015</td>
-<td>0.094 ± 0.001 [0.081, 0.108]</td>
-<td>0.053 ± 0.000 [0.045, 0.062]</td>
-<td>0.040 ± 0.001 [0.033, 0.048]</td>
-<td>0.134 ± 0.000 [0.118, 0.150]</td>
-<td>0.063 ± 0.001 [0.054, 0.072]</td>
+<td>821</td>
+<td>0.096 ± 0.001 [0.082, 0.108]</td>
+<td>0.055 ± 0.002 [0.048, 0.063]</td>
+<td>0.043 ± 0.002 [0.036, 0.051]</td>
+<td>0.141 ± 0.001 [0.125, 0.157]</td>
+<td>0.067 ± 0.001 [0.058, 0.075]</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
-<td>1015</td>
-<td>0.066 ± 0.001 [0.055, 0.078]</td>
-<td>0.038 ± 0.000 [0.031, 0.045]</td>
-<td>0.030 ± 0.000 [0.023, 0.036]</td>
-<td>0.105 ± 0.002 [0.093, 0.117]</td>
-<td>0.048 ± 0.000 [0.041, 0.055]</td>
+<td>821</td>
+<td>0.072 ± 0.004 [0.061, 0.084]</td>
+<td>0.042 ± 0.000 [0.034, 0.050]</td>
+<td>0.032 ± 0.001 [0.026, 0.039]</td>
+<td>0.102 ± 0.007 [0.086, 0.118]</td>
+<td>0.049 ± 0.001 [0.041, 0.057]</td>
 </tr>
 <tr>
 <td>Conversation-aware</td>
-<td>1015</td>
-<td>0.076 ± 0.000 [0.064, 0.087]</td>
-<td>0.045 ± 0.001 [0.037, 0.054]</td>
-<td>0.036 ± 0.000 [0.029, 0.043]</td>
-<td>0.121 ± 0.006 [0.106, 0.135]</td>
-<td>0.057 ± 0.002 [0.049, 0.065]</td>
+<td>821</td>
+<td>0.082 ± 0.002 [0.070, 0.096]</td>
+<td>0.047 ± 0.001 [0.040, 0.055]</td>
+<td>0.036 ± 0.001 [0.030, 0.045]</td>
+<td>0.110 ± 0.004 [0.096, 0.126]</td>
+<td>0.054 ± 0.002 [0.046, 0.063]</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>821</td>
+<td>0.063 ± 0.002 [0.052, 0.075]</td>
+<td>0.034 ± 0.003 [0.027, 0.040]</td>
+<td>0.025 ± 0.005 [0.020, 0.030]</td>
+<td>0.090 ± 0.007 [0.076, 0.103]</td>
+<td>0.041 ± 0.002 [0.034, 0.047]</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>821</td>
+<td>0.094 ± 0.007 [0.081, 0.110]</td>
+<td>0.051 ± 0.002 [0.044, 0.058]</td>
+<td>0.037 ± 0.000 [0.032, 0.044]</td>
+<td>0.147 ± 0.003 [0.130, 0.164]</td>
+<td>0.064 ± 0.001 [0.056, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
-<td>1015</td>
-<td>0.100 ± 0.000 [0.086, 0.112]</td>
-<td>0.057 ± 0.001 [0.048, 0.064]</td>
-<td>0.044 ± 0.001 [0.037, 0.052]</td>
-<td>0.141 ± 0.003 [0.127, 0.155]</td>
-<td>0.067 ± 0.000 [0.059, 0.075]</td>
+<td>821</td>
+<td>0.103 ± 0.002 [0.090, 0.116]</td>
+<td>0.054 ± 0.004 [0.046, 0.062]</td>
+<td>0.039 ± 0.005 [0.032, 0.046]</td>
+<td>0.143 ± 0.002 [0.128, 0.160]</td>
+<td>0.063 ± 0.004 [0.056, 0.073]</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
-<td>1015</td>
-<td>0.093 ± 0.003 [0.081, 0.108]</td>
-<td>0.052 ± 0.003 [0.044, 0.060]</td>
-<td>0.039 ± 0.003 [0.033, 0.047]</td>
-<td>0.139 ± 0.002 [0.124, 0.153]</td>
-<td>0.063 ± 0.003 [0.056, 0.072]</td>
+<td>821</td>
+<td>0.102 ± 0.002 [0.090, 0.115]</td>
+<td>0.053 ± 0.004 [0.046, 0.061]</td>
+<td>0.039 ± 0.004 [0.032, 0.045]</td>
+<td>0.144 ± 0.001 [0.129, 0.159]</td>
+<td>0.064 ± 0.004 [0.056, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
-<td>1015</td>
-<td>0.088 ± 0.004 [0.074, 0.101]</td>
-<td>0.049 ± 0.003 [0.041, 0.057]</td>
-<td>0.037 ± 0.002 [0.031, 0.044]</td>
-<td>0.124 ± 0.006 [0.108, 0.138]</td>
-<td>0.058 ± 0.003 [0.050, 0.067]</td>
+<td>821</td>
+<td>0.091 ± 0.003 [0.079, 0.104]</td>
+<td>0.052 ± 0.004 [0.044, 0.061]</td>
+<td>0.041 ± 0.004 [0.032, 0.048]</td>
+<td>0.133 ± 0.004 [0.119, 0.149]</td>
+<td>0.063 ± 0.002 [0.055, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
-<td>1015</td>
-<td>0.091 ± 0.000 [0.077, 0.101]</td>
-<td>0.052 ± 0.001 [0.044, 0.061]</td>
-<td>0.041 ± 0.001 [0.033, 0.049]</td>
-<td>0.140 ± 0.009 [0.126, 0.155]</td>
-<td>0.065 ± 0.003 [0.056, 0.072]</td>
+<td>821</td>
+<td>0.094 ± 0.002 [0.082, 0.107]</td>
+<td>0.053 ± 0.003 [0.045, 0.062]</td>
+<td>0.041 ± 0.004 [0.032, 0.048]</td>
+<td>0.136 ± 0.005 [0.121, 0.152]</td>
+<td>0.064 ± 0.002 [0.056, 0.073]</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
-<td>1015</td>
-<td>0.086 ± 0.005 [0.073, 0.098]</td>
-<td>0.047 ± 0.002 [0.040, 0.055]</td>
-<td>0.035 ± 0.002 [0.029, 0.042]</td>
-<td>0.126 ± 0.004 [0.111, 0.138]</td>
-<td>0.057 ± 0.002 [0.049, 0.065]</td>
+<td>821</td>
+<td>0.088 ± 0.007 [0.076, 0.102]</td>
+<td>0.052 ± 0.004 [0.044, 0.061]</td>
+<td>0.041 ± 0.003 [0.033, 0.049]</td>
+<td>0.136 ± 0.009 [0.121, 0.152]</td>
+<td>0.064 ± 0.005 [0.055, 0.072]</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
-<td>1015</td>
-<td>0.091 ± 0.000 [0.077, 0.101]</td>
-<td>0.052 ± 0.001 [0.044, 0.061]</td>
-<td>0.041 ± 0.001 [0.033, 0.049]</td>
-<td>0.140 ± 0.008 [0.126, 0.155]</td>
-<td>0.065 ± 0.003 [0.057, 0.072]</td>
+<td>821</td>
+<td>0.094 ± 0.002 [0.082, 0.107]</td>
+<td>0.053 ± 0.003 [0.045, 0.062]</td>
+<td>0.041 ± 0.004 [0.032, 0.048]</td>
+<td>0.136 ± 0.004 [0.120, 0.152]</td>
+<td>0.064 ± 0.002 [0.055, 0.073]</td>
 </tr>
 </tbody>
 </table>
@@ -677,275 +1148,1097 @@
 <tr>
 <td>LTP-only</td>
 <td>78</td>
-<td>0.038 ± 0.013 [0.006, 0.071]</td>
-<td>0.014 ± 0.002 [0.002, 0.027]</td>
-<td>0.007 ± 0.000 [0.001, 0.013]</td>
-<td>0.051 ± 0.013 [0.013, 0.083]</td>
-<td>0.017 ± 0.002 [0.004, 0.030]</td>
+<td>0.032 ± 0.006 [0.006, 0.064]</td>
+<td>0.012 ± 0.001 [0.002, 0.024]</td>
+<td>0.006 ± 0.000 [0.001, 0.012]</td>
+<td>0.045 ± 0.006 [0.013, 0.083]</td>
+<td>0.015 ± 0.001 [0.004, 0.027]</td>
 </tr>
 <tr>
 <td>STI-only</td>
 <td>78</td>
-<td>0.224 ± 0.006 [0.154, 0.295]</td>
-<td>0.107 ± 0.012 [0.070, 0.140]</td>
-<td>0.072 ± 0.014 [0.045, 0.102]</td>
-<td>0.372 ± 0.026 [0.307, 0.442]</td>
-<td>0.144 ± 0.018 [0.108, 0.180]</td>
+<td>0.237 ± 0.019 [0.167, 0.295]</td>
+<td>0.112 ± 0.023 [0.077, 0.148]</td>
+<td>0.075 ± 0.024 [0.046, 0.103]</td>
+<td>0.391 ± 0.006 [0.308, 0.462]</td>
+<td>0.151 ± 0.019 [0.114, 0.185]</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
 <td>78</td>
-<td>0.186 ± 0.006 [0.135, 0.244]</td>
-<td>0.100 ± 0.004 [0.067, 0.139]</td>
-<td>0.075 ± 0.003 [0.044, 0.108]</td>
-<td>0.321 ± 0.026 [0.250, 0.404]</td>
-<td>0.135 ± 0.004 [0.097, 0.173]</td>
+<td>0.250 ± 0.006 [0.186, 0.321]</td>
+<td>0.117 ± 0.010 [0.084, 0.151]</td>
+<td>0.077 ± 0.015 [0.048, 0.107]</td>
+<td>0.385 ± 0.026 [0.308, 0.455]</td>
+<td>0.150 ± 0.018 [0.116, 0.187]</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
 <td>78</td>
-<td>0.205 ± 0.013 [0.135, 0.269]</td>
-<td>0.101 ± 0.018 [0.066, 0.130]</td>
-<td>0.069 ± 0.019 [0.042, 0.094]</td>
-<td>0.372 ± 0.026 [0.288, 0.442]</td>
-<td>0.143 ± 0.022 [0.109, 0.178]</td>
+<td>0.250 ± 0.019 [0.179, 0.321]</td>
+<td>0.117 ± 0.010 [0.081, 0.151]</td>
+<td>0.078 ± 0.018 [0.049, 0.105]</td>
+<td>0.385 ± 0.026 [0.295, 0.462]</td>
+<td>0.151 ± 0.022 [0.114, 0.184]</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
 <td>78</td>
-<td>0.032 ± 0.006 [0.006, 0.058]</td>
-<td>0.012 ± 0.002 [0.003, 0.023]</td>
-<td>0.006 ± 0.001 [0.002, 0.012]</td>
-<td>0.032 ± 0.006 [0.006, 0.058]</td>
-<td>0.012 ± 0.002 [0.003, 0.023]</td>
+<td>0.026 ± 0.013 [0.006, 0.051]</td>
+<td>0.012 ± 0.004 [0.002, 0.024]</td>
+<td>0.007 ± 0.001 [0.001, 0.016]</td>
+<td>0.045 ± 0.006 [0.013, 0.077]</td>
+<td>0.017 ± 0.002 [0.005, 0.028]</td>
 </tr>
 <tr>
 <td>Conversation-aware</td>
 <td>78</td>
-<td>0.038 ± 0.013 [0.013, 0.071]</td>
-<td>0.015 ± 0.006 [0.004, 0.026]</td>
-<td>0.008 ± 0.004 [0.002, 0.015]</td>
-<td>0.064 ± 0.026 [0.026, 0.109]</td>
-<td>0.021 ± 0.009 [0.009, 0.036]</td>
+<td>0.109 ± 0.019 [0.064, 0.154]</td>
+<td>0.052 ± 0.010 [0.029, 0.079]</td>
+<td>0.035 ± 0.007 [0.016, 0.059]</td>
+<td>0.218 ± 0.064 [0.154, 0.276]</td>
+<td>0.079 ± 0.021 [0.055, 0.105]</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>78</td>
+<td>0.051 ± 0.000 [0.019, 0.083]</td>
+<td>0.018 ± 0.003 [0.006, 0.032]</td>
+<td>0.009 ± 0.003 [0.002, 0.017]</td>
+<td>0.090 ± 0.013 [0.045, 0.135]</td>
+<td>0.028 ± 0.006 [0.012, 0.043]</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>78</td>
+<td>0.263 ± 0.019 [0.199, 0.327]</td>
+<td>0.121 ± 0.000 [0.090, 0.161]</td>
+<td>0.079 ± 0.005 [0.053, 0.112]</td>
+<td>0.410 ± 0.000 [0.327, 0.494]</td>
+<td>0.158 ± 0.004 [0.125, 0.196]</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>78</td>
-<td>0.199 ± 0.006 [0.141, 0.257]</td>
-<td>0.103 ± 0.000 [0.070, 0.137]</td>
-<td>0.074 ± 0.002 [0.045, 0.103]</td>
-<td>0.372 ± 0.026 [0.295, 0.462]</td>
-<td>0.147 ± 0.005 [0.113, 0.181]</td>
+<td>0.218 ± 0.013 [0.154, 0.282]</td>
+<td>0.107 ± 0.007 [0.074, 0.139]</td>
+<td>0.073 ± 0.005 [0.048, 0.100]</td>
+<td>0.410 ± 0.000 [0.327, 0.494]</td>
+<td>0.155 ± 0.003 [0.120, 0.186]</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>78</td>
-<td>0.231 ± 0.013 [0.160, 0.289]</td>
-<td>0.108 ± 0.000 [0.075, 0.141]</td>
-<td>0.071 ± 0.003 [0.046, 0.099]</td>
-<td>0.372 ± 0.013 [0.301, 0.449]</td>
-<td>0.144 ± 0.006 [0.110, 0.180]</td>
+<td>0.224 ± 0.006 [0.160, 0.288]</td>
+<td>0.108 ± 0.005 [0.076, 0.141]</td>
+<td>0.073 ± 0.004 [0.047, 0.100]</td>
+<td>0.410 ± 0.000 [0.327, 0.494]</td>
+<td>0.156 ± 0.003 [0.120, 0.186]</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>78</td>
-<td>0.218 ± 0.000 [0.154, 0.282]</td>
-<td>0.107 ± 0.008 [0.070, 0.143]</td>
-<td>0.073 ± 0.011 [0.046, 0.107]</td>
-<td>0.397 ± 0.013 [0.314, 0.481]</td>
-<td>0.152 ± 0.012 [0.114, 0.192]</td>
+<td>0.205 ± 0.013 [0.141, 0.263]</td>
+<td>0.095 ± 0.004 [0.065, 0.121]</td>
+<td>0.061 ± 0.002 [0.038, 0.082]</td>
+<td>0.397 ± 0.013 [0.314, 0.474]</td>
+<td>0.143 ± 0.001 [0.108, 0.170]</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
 <td>78</td>
-<td>0.224 ± 0.032 [0.160, 0.295]</td>
-<td>0.105 ± 0.012 [0.070, 0.146]</td>
-<td>0.070 ± 0.005 [0.044, 0.103]</td>
-<td>0.359 ± 0.013 [0.282, 0.429]</td>
-<td>0.139 ± 0.007 [0.105, 0.176]</td>
+<td>0.212 ± 0.006 [0.141, 0.269]</td>
+<td>0.096 ± 0.001 [0.067, 0.125]</td>
+<td>0.061 ± 0.000 [0.037, 0.083]</td>
+<td>0.391 ± 0.006 [0.295, 0.475]</td>
+<td>0.142 ± 0.001 [0.106, 0.170]</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>78</td>
-<td>0.186 ± 0.032 [0.128, 0.244]</td>
-<td>0.095 ± 0.014 [0.064, 0.128]</td>
-<td>0.068 ± 0.009 [0.041, 0.097]</td>
-<td>0.410 ± 0.000 [0.333, 0.494]</td>
-<td>0.151 ± 0.007 [0.118, 0.186]</td>
+<td>0.212 ± 0.019 [0.154, 0.276]</td>
+<td>0.094 ± 0.015 [0.064, 0.121]</td>
+<td>0.059 ± 0.013 [0.037, 0.077]</td>
+<td>0.378 ± 0.019 [0.308, 0.462]</td>
+<td>0.136 ± 0.014 [0.105, 0.167]</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>78</td>
-<td>0.224 ± 0.032 [0.160, 0.295]</td>
-<td>0.105 ± 0.012 [0.070, 0.146]</td>
-<td>0.070 ± 0.005 [0.044, 0.103]</td>
-<td>0.359 ± 0.013 [0.282, 0.429]</td>
-<td>0.139 ± 0.007 [0.105, 0.176]</td>
+<td>0.212 ± 0.006 [0.141, 0.269]</td>
+<td>0.096 ± 0.001 [0.067, 0.125]</td>
+<td>0.061 ± 0.000 [0.037, 0.083]</td>
+<td>0.391 ± 0.006 [0.295, 0.475]</td>
+<td>0.142 ± 0.001 [0.106, 0.170]</td>
 </tr>
 </tbody>
 </table>
 <p><img alt="conflict" src="../figures/fig04_conflict_vs_nonconflict.png" /></p>
 <p><img alt="subsets" src="../figures/fig05_relationship_subsets.png" /></p>
-<h3>4.4 Paired significance on conflict subsets (Hit@10)</h3>
+<h3>4.4 Synthetic conflict subset by injection intensity (mean ± std over seeds)</h3>
+<table>
+<thead>
+<tr>
+<th>intensity</th>
+<th>model</th>
+<th>n</th>
+<th>seeds</th>
+<th>Hit@10_mean</th>
+<th>Hit@10_std</th>
+<th>NDCG@10_mean</th>
+<th>NDCG@10_std</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>LTP-only</td>
+<td>27</td>
+<td>2</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>STI-only</td>
+<td>27</td>
+<td>2</td>
+<td>0.296</td>
+<td>0.074</td>
+<td>0.138</td>
+<td>0.054</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Naive fusion</td>
+<td>27</td>
+<td>2</td>
+<td>0.296</td>
+<td>0.037</td>
+<td>0.116</td>
+<td>0.026</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Adaptive fusion</td>
+<td>27</td>
+<td>2</td>
+<td>0.278</td>
+<td>0.093</td>
+<td>0.119</td>
+<td>0.024</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Sequential (GRU)</td>
+<td>27</td>
+<td>2</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Conversation-aware</td>
+<td>27</td>
+<td>2</td>
+<td>0.148</td>
+<td>0.037</td>
+<td>0.081</td>
+<td>0.033</td>
+</tr>
+<tr>
+<td>1</td>
+<td>SASRec</td>
+<td>27</td>
+<td>2</td>
+<td>0.056</td>
+<td>0.019</td>
+<td>0.018</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>1</td>
+<td>KBRD-style</td>
+<td>27</td>
+<td>2</td>
+<td>0.426</td>
+<td>0.093</td>
+<td>0.186</td>
+<td>0.034</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA w/o relationship</td>
+<td>27</td>
+<td>2</td>
+<td>0.185</td>
+<td>0.074</td>
+<td>0.104</td>
+<td>0.039</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA w/o counterfactual</td>
+<td>27</td>
+<td>2</td>
+<td>0.185</td>
+<td>0.074</td>
+<td>0.102</td>
+<td>0.041</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA w/o clarification</td>
+<td>27</td>
+<td>2</td>
+<td>0.241</td>
+<td>0.093</td>
+<td>0.111</td>
+<td>0.036</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA w/o persistence</td>
+<td>27</td>
+<td>2</td>
+<td>0.241</td>
+<td>0.093</td>
+<td>0.111</td>
+<td>0.036</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA (rule policy)</td>
+<td>27</td>
+<td>2</td>
+<td>0.259</td>
+<td>0.074</td>
+<td>0.114</td>
+<td>0.034</td>
+</tr>
+<tr>
+<td>1</td>
+<td>AIPA (full)</td>
+<td>27</td>
+<td>2</td>
+<td>0.241</td>
+<td>0.093</td>
+<td>0.111</td>
+<td>0.036</td>
+</tr>
+<tr>
+<td>2</td>
+<td>LTP-only</td>
+<td>21</td>
+<td>2</td>
+<td>0.048</td>
+<td>0.000</td>
+<td>0.018</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>2</td>
+<td>STI-only</td>
+<td>21</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.071</td>
+<td>0.108</td>
+<td>0.013</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Naive fusion</td>
+<td>21</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.071</td>
+<td>0.117</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Adaptive fusion</td>
+<td>21</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.071</td>
+<td>0.099</td>
+<td>0.046</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Sequential (GRU)</td>
+<td>21</td>
+<td>2</td>
+<td>0.024</td>
+<td>0.024</td>
+<td>0.008</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Conversation-aware</td>
+<td>21</td>
+<td>2</td>
+<td>0.119</td>
+<td>0.071</td>
+<td>0.057</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>2</td>
+<td>SASRec</td>
+<td>21</td>
+<td>2</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>KBRD-style</td>
+<td>21</td>
+<td>2</td>
+<td>0.167</td>
+<td>0.071</td>
+<td>0.102</td>
+<td>0.058</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA w/o relationship</td>
+<td>21</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.119</td>
+<td>0.105</td>
+<td>0.039</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA w/o counterfactual</td>
+<td>21</td>
+<td>2</td>
+<td>0.238</td>
+<td>0.143</td>
+<td>0.113</td>
+<td>0.049</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA w/o clarification</td>
+<td>21</td>
+<td>2</td>
+<td>0.190</td>
+<td>0.143</td>
+<td>0.094</td>
+<td>0.046</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA w/o persistence</td>
+<td>21</td>
+<td>2</td>
+<td>0.238</td>
+<td>0.143</td>
+<td>0.106</td>
+<td>0.044</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA (rule policy)</td>
+<td>21</td>
+<td>2</td>
+<td>0.190</td>
+<td>0.048</td>
+<td>0.092</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AIPA (full)</td>
+<td>21</td>
+<td>2</td>
+<td>0.238</td>
+<td>0.143</td>
+<td>0.106</td>
+<td>0.044</td>
+</tr>
+<tr>
+<td>3</td>
+<td>LTP-only</td>
+<td>30</td>
+<td>2</td>
+<td>0.050</td>
+<td>0.017</td>
+<td>0.019</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>3</td>
+<td>STI-only</td>
+<td>30</td>
+<td>2</td>
+<td>0.200</td>
+<td>0.033</td>
+<td>0.093</td>
+<td>0.021</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Naive fusion</td>
+<td>30</td>
+<td>2</td>
+<td>0.233</td>
+<td>0.000</td>
+<td>0.117</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Adaptive fusion</td>
+<td>30</td>
+<td>2</td>
+<td>0.250</td>
+<td>0.017</td>
+<td>0.127</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Sequential (GRU)</td>
+<td>30</td>
+<td>2</td>
+<td>0.050</td>
+<td>0.017</td>
+<td>0.025</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Conversation-aware</td>
+<td>30</td>
+<td>2</td>
+<td>0.067</td>
+<td>0.033</td>
+<td>0.021</td>
+<td>0.011</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SASRec</td>
+<td>30</td>
+<td>2</td>
+<td>0.083</td>
+<td>0.017</td>
+<td>0.031</td>
+<td>0.011</td>
+</tr>
+<tr>
+<td>3</td>
+<td>KBRD-style</td>
+<td>30</td>
+<td>2</td>
+<td>0.183</td>
+<td>0.017</td>
+<td>0.077</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA w/o relationship</td>
+<td>30</td>
+<td>2</td>
+<td>0.250</td>
+<td>0.050</td>
+<td>0.110</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA w/o counterfactual</td>
+<td>30</td>
+<td>2</td>
+<td>0.250</td>
+<td>0.050</td>
+<td>0.111</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA w/o clarification</td>
+<td>30</td>
+<td>2</td>
+<td>0.183</td>
+<td>0.017</td>
+<td>0.081</td>
+<td>0.011</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA w/o persistence</td>
+<td>30</td>
+<td>2</td>
+<td>0.167</td>
+<td>0.000</td>
+<td>0.076</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA (rule policy)</td>
+<td>30</td>
+<td>2</td>
+<td>0.183</td>
+<td>0.017</td>
+<td>0.078</td>
+<td>0.011</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AIPA (full)</td>
+<td>30</td>
+<td>2</td>
+<td>0.167</td>
+<td>0.000</td>
+<td>0.076</td>
+<td>0.005</td>
+</tr>
+</tbody>
+</table>
+<h3>4.5 Paired significance on conflict subsets (Hit@10)</h3>
 <table>
 <thead>
 <tr>
 <th>subset</th>
 <th>control</th>
 <th>n</th>
+<th>n_samples</th>
+<th>n_seeds</th>
 <th>mean_diff</th>
+<th>seed_std_diff</th>
+<th>t_p</th>
+<th>t_p_holm</th>
 <th>wilcoxon_p</th>
 <th>wilcoxon_p_holm</th>
+<th>perm_p</th>
+<th>perm_p_holm</th>
 <th>cohen_d</th>
 <th>cliffs_delta</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>conflict_natural</td>
+<td>conflict_natural_strict</td>
 <td>AIPA (rule policy)</td>
+<td>124</td>
 <td>62</td>
-<td>-0.0161</td>
-<td>0.8068</td>
+<td>2</td>
+<td>0.0081</td>
+<td>0.0081</td>
+<td>0.7071</td>
 <td>1.0000</td>
-<td>-0.1034</td>
-<td>-0.0169</td>
+<td>0.8654</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0338</td>
+<td>0.0081</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
+<td>conflict_natural_strict</td>
 <td>AIPA w/o clarification</td>
+<td>124</td>
 <td>62</td>
-<td>-0.0484</td>
-<td>0.3430</td>
+<td>2</td>
+<td>0.0081</td>
+<td>0.0081</td>
+<td>0.3193</td>
 <td>1.0000</td>
-<td>-0.2463</td>
-<td>-0.0650</td>
+<td>0.8591</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0898</td>
+<td>0.0081</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
+<td>conflict_natural_strict</td>
 <td>AIPA w/o counterfactual</td>
+<td>124</td>
 <td>62</td>
-<td>-0.0484</td>
-<td>0.2427</td>
+<td>2</td>
+<td>-0.0081</td>
+<td>0.0242</td>
+<td>0.7071</td>
 <td>1.0000</td>
-<td>-0.2775</td>
-<td>-0.0793</td>
+<td>0.8654</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>-0.0338</td>
+<td>-0.0081</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
+<td>conflict_natural_strict</td>
 <td>AIPA w/o persistence</td>
+<td>124</td>
 <td>62</td>
+<td>2</td>
+<td>0.0000</td>
 <td>0.0000</td>
 <td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
+<td>conflict_natural_strict</td>
 <td>AIPA w/o relationship</td>
+<td>124</td>
 <td>62</td>
-<td>-0.0565</td>
-<td>0.1778</td>
-<td>1.0000</td>
-<td>-0.2760</td>
-<td>-0.0950</td>
-</tr>
-<tr>
-<td>conflict_natural</td>
-<td>Adaptive fusion</td>
-<td>62</td>
-<td>0.0081</td>
-<td>0.8098</td>
-<td>1.0000</td>
-<td>0.0729</td>
-<td>0.0156</td>
-</tr>
-<tr>
-<td>conflict_natural</td>
-<td>Conversation-aware</td>
-<td>62</td>
-<td>-0.0161</td>
-<td>0.6450</td>
-<td>1.0000</td>
-<td>-0.1034</td>
-<td>-0.0312</td>
-</tr>
-<tr>
-<td>conflict_natural</td>
-<td>LTP-only</td>
-<td>62</td>
-<td>0.0403</td>
-<td>0.3430</td>
-<td>1.0000</td>
-<td>0.2452</td>
-<td>0.0494</td>
-</tr>
-<tr>
-<td>conflict_natural</td>
-<td>Naive fusion</td>
-<td>62</td>
+<td>2</td>
 <td>-0.0081</td>
-<td>0.8098</td>
+<td>0.0242</td>
+<td>0.7071</td>
 <td>1.0000</td>
-<td>-0.0729</td>
+<td>0.8654</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>-0.0338</td>
+<td>-0.0081</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>Adaptive fusion</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0081</td>
+<td>0.0242</td>
+<td>0.6565</td>
+<td>1.0000</td>
+<td>0.8634</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0400</td>
+<td>0.0081</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>Conversation-aware</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0403</td>
+<td>0.0081</td>
+<td>0.1322</td>
+<td>1.0000</td>
+<td>0.4106</td>
+<td>1.0000</td>
+<td>0.2149</td>
+<td>1.0000</td>
+<td>0.1361</td>
+<td>0.0403</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>KBRD-style</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>-0.0323</td>
+<td>0.0000</td>
+<td>0.2498</td>
+<td>1.0000</td>
+<td>0.5134</td>
+<td>1.0000</td>
+<td>0.3908</td>
+<td>1.0000</td>
+<td>-0.1038</td>
+<td>-0.0323</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>LTP-only</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0726</td>
+<td>0.0081</td>
+<td>0.0024</td>
+<td>0.0309</td>
+<td>0.1329</td>
+<td>1.0000</td>
+<td>0.0035</td>
+<td>0.0455</td>
+<td>0.2786</td>
+<td>0.0726</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>Naive fusion</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0242</td>
+<td>0.0081</td>
+<td>0.1808</td>
+<td>1.0000</td>
+<td>0.6058</td>
+<td>1.0000</td>
+<td>0.3758</td>
+<td>1.0000</td>
+<td>0.1209</td>
+<td>0.0242</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>SASRec</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0726</td>
+<td>0.0081</td>
+<td>0.0062</td>
+<td>0.0741</td>
+<td>0.1386</td>
+<td>1.0000</td>
+<td>0.0105</td>
+<td>0.1259</td>
+<td>0.2502</td>
+<td>0.0726</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>STI-only</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0242</td>
+<td>0.0081</td>
+<td>0.3678</td>
+<td>1.0000</td>
+<td>0.6215</td>
+<td>1.0000</td>
+<td>0.5467</td>
+<td>1.0000</td>
+<td>0.0812</td>
+<td>0.0242</td>
+</tr>
+<tr>
+<td>conflict_natural_strict</td>
+<td>Sequential (GRU)</td>
+<td>124</td>
+<td>62</td>
+<td>2</td>
+<td>0.0484</td>
+<td>0.0000</td>
+<td>0.1091</td>
+<td>1.0000</td>
+<td>0.3338</td>
+<td>1.0000</td>
+<td>0.1669</td>
+<td>1.0000</td>
+<td>0.1449</td>
+<td>0.0484</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>AIPA (rule policy)</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0020</td>
+<td>0.0059</td>
+<td>0.8577</td>
+<td>1.0000</td>
+<td>0.9336</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0079</td>
+<td>0.0020</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>AIPA w/o clarification</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0020</td>
+<td>0.0059</td>
+<td>0.5642</td>
+<td>1.0000</td>
+<td>0.9300</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0255</td>
+<td>0.0020</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>AIPA w/o counterfactual</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>-0.0156</td>
+<td>0.0117</td>
+<td>0.1443</td>
+<td>1.0000</td>
+<td>0.5044</td>
+<td>1.0000</td>
+<td>0.2029</td>
+<td>1.0000</td>
+<td>-0.0646</td>
 <td>-0.0156</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
-<td>STI-only</td>
-<td>62</td>
-<td>-0.0565</td>
-<td>0.1670</td>
-<td>1.0000</td>
-<td>-0.3078</td>
-<td>-0.0950</td>
+<td>conflict_natural_broad</td>
+<td>AIPA w/o persistence</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
 </tr>
 <tr>
-<td>conflict_natural</td>
-<td>Sequential (GRU)</td>
-<td>62</td>
-<td>0.0242</td>
-<td>0.6459</td>
+<td>conflict_natural_broad</td>
+<td>AIPA w/o relationship</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>-0.0195</td>
+<td>0.0117</td>
+<td>0.0678</td>
+<td>0.5427</td>
+<td>0.4040</td>
 <td>1.0000</td>
-<td>0.1147</td>
-<td>0.0182</td>
+<td>0.0860</td>
+<td>0.6877</td>
+<td>-0.0809</td>
+<td>-0.0195</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>Adaptive fusion</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0000</td>
+<td>0.0039</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>Conversation-aware</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0273</td>
+<td>0.0039</td>
+<td>0.0195</td>
+<td>0.1948</td>
+<td>0.2478</td>
+<td>1.0000</td>
+<td>0.0355</td>
+<td>0.3548</td>
+<td>0.1036</td>
+<td>0.0273</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>KBRD-style</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>-0.0254</td>
+<td>0.0059</td>
+<td>0.0324</td>
+<td>0.2920</td>
+<td>0.2840</td>
+<td>1.0000</td>
+<td>0.0390</td>
+<td>0.3548</td>
+<td>-0.0948</td>
+<td>-0.0254</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>LTP-only</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0625</td>
+<td>0.0117</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0092</td>
+<td>0.1196</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.2180</td>
+<td>0.0625</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>Naive fusion</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0137</td>
+<td>0.0137</td>
+<td>0.2371</td>
+<td>1.0000</td>
+<td>0.5626</td>
+<td>1.0000</td>
+<td>0.2999</td>
+<td>1.0000</td>
+<td>0.0523</td>
+<td>0.0137</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>SASRec</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0469</td>
+<td>0.0039</td>
+<td>0.0005</td>
+<td>0.0055</td>
+<td>0.0524</td>
+<td>0.6291</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.1548</td>
+<td>0.0469</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>STI-only</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>-0.0020</td>
+<td>0.0020</td>
+<td>0.8730</td>
+<td>1.0000</td>
+<td>0.9346</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>-0.0071</td>
+<td>-0.0020</td>
+</tr>
+<tr>
+<td>conflict_natural_broad</td>
+<td>Sequential (GRU)</td>
+<td>512</td>
+<td>256</td>
+<td>2</td>
+<td>0.0449</td>
+<td>0.0137</td>
+<td>0.0003</td>
+<td>0.0037</td>
+<td>0.0599</td>
+<td>0.6584</td>
+<td>0.0010</td>
+<td>0.0110</td>
+<td>0.1606</td>
+<td>0.0449</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>AIPA (rule policy)</td>
+<td>156</td>
 <td>78</td>
-<td>0.0385</td>
-<td>0.3530</td>
+<td>2</td>
+<td>0.0000</td>
+<td>0.0256</td>
 <td>1.0000</td>
-<td>0.1454</td>
-<td>0.0307</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>AIPA w/o clarification</td>
+<td>156</td>
 <td>78</td>
+<td>2</td>
 <td>0.0064</td>
-<td>0.8569</td>
+<td>0.0064</td>
+<td>0.5654</td>
 <td>1.0000</td>
-<td>0.0209</td>
-<td>-0.0102</td>
+<td>0.8755</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>0.0461</td>
+<td>0.0064</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>AIPA w/o counterfactual</td>
+<td>156</td>
 <td>78</td>
-<td>-0.0064</td>
-<td>0.6025</td>
+<td>2</td>
+<td>-0.0128</td>
+<td>0.0128</td>
+<td>0.6845</td>
 <td>1.0000</td>
-<td>-0.0246</td>
-<td>-0.0251</td>
+<td>0.7814</td>
+<td>1.0000</td>
+<td>0.8331</td>
+<td>1.0000</td>
+<td>-0.0326</td>
+<td>-0.0128</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>AIPA w/o persistence</td>
+<td>156</td>
 <td>78</td>
+<td>2</td>
 <td>0.0000</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
 <td>n/a</td>
@@ -954,72 +2247,155 @@
 <tr>
 <td>conflict_synthetic</td>
 <td>AIPA w/o relationship</td>
+<td>156</td>
 <td>78</td>
-<td>0.0256</td>
-<td>0.5522</td>
+<td>2</td>
+<td>-0.0064</td>
+<td>0.0192</td>
+<td>0.8356</td>
 <td>1.0000</td>
-<td>0.1132</td>
-<td>0.0299</td>
+<td>0.8891</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>-0.0166</td>
+<td>-0.0064</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>Adaptive fusion</td>
+<td>156</td>
 <td>78</td>
-<td>0.0192</td>
-<td>0.6896</td>
+<td>2</td>
+<td>-0.0385</td>
+<td>0.0256</td>
+<td>0.2582</td>
 <td>1.0000</td>
-<td>0.0821</td>
-<td>0.0048</td>
+<td>0.4152</td>
+<td>1.0000</td>
+<td>0.3418</td>
+<td>1.0000</td>
+<td>-0.0909</td>
+<td>-0.0385</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>Conversation-aware</td>
+<td>156</td>
 <td>78</td>
-<td>0.1859</td>
-<td>0.0002</td>
-<td>0.0016</td>
-<td>0.5577</td>
-<td>0.2558</td>
+<td>2</td>
+<td>0.1026</td>
+<td>0.0128</td>
+<td>0.0015</td>
+<td>0.0150</td>
+<td>0.0281</td>
+<td>0.2809</td>
+<td>0.0035</td>
+<td>0.0350</td>
+<td>0.2587</td>
+<td>0.1026</td>
+</tr>
+<tr>
+<td>conflict_synthetic</td>
+<td>KBRD-style</td>
+<td>156</td>
+<td>78</td>
+<td>2</td>
+<td>-0.0513</td>
+<td>0.0256</td>
+<td>0.1953</td>
+<td>1.0000</td>
+<td>0.3021</td>
+<td>1.0000</td>
+<td>0.2464</td>
+<td>1.0000</td>
+<td>-0.1041</td>
+<td>-0.0513</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>LTP-only</td>
+<td>156</td>
 <td>78</td>
-<td>0.1859</td>
-<td>0.0001</td>
-<td>0.0010</td>
-<td>0.5748</td>
-<td>0.2558</td>
+<td>2</td>
+<td>0.1795</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0002</td>
+<td>0.0020</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.4471</td>
+<td>0.1795</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>Naive fusion</td>
+<td>156</td>
 <td>78</td>
-<td>0.0385</td>
-<td>0.4339</td>
+<td>2</td>
+<td>-0.0385</td>
+<td>0.0000</td>
+<td>0.2582</td>
 <td>1.0000</td>
-<td>0.1454</td>
-<td>0.0661</td>
+<td>0.4152</td>
+<td>1.0000</td>
+<td>0.3423</td>
+<td>1.0000</td>
+<td>-0.0909</td>
+<td>-0.0385</td>
+</tr>
+<tr>
+<td>conflict_synthetic</td>
+<td>SASRec</td>
+<td>156</td>
+<td>78</td>
+<td>2</td>
+<td>0.1603</td>
+<td>0.0064</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0008</td>
+<td>0.0091</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.3840</td>
+<td>0.1603</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>STI-only</td>
+<td>156</td>
 <td>78</td>
-<td>0.0000</td>
+<td>2</td>
+<td>-0.0256</td>
+<td>0.0256</td>
+<td>0.4160</td>
 <td>1.0000</td>
+<td>0.5789</td>
 <td>1.0000</td>
-<td>0.0000</td>
-<td>-0.0141</td>
+<td>0.5387</td>
+<td>1.0000</td>
+<td>-0.0653</td>
+<td>-0.0256</td>
 </tr>
 <tr>
 <td>conflict_synthetic</td>
 <td>Sequential (GRU)</td>
+<td>156</td>
 <td>78</td>
-<td>0.1923</td>
+<td>2</td>
+<td>0.1859</td>
+<td>0.0064</td>
+<td>0.0000</td>
+<td>0.0000</td>
 <td>0.0001</td>
-<td>0.0006</td>
-<td>0.5924</td>
-<td>0.2597</td>
+<td>0.0014</td>
+<td>0.0005</td>
+<td>0.0065</td>
+<td>0.4573</td>
+<td>0.1859</td>
 </tr>
 </tbody>
 </table>
@@ -1045,252 +2421,252 @@
 <tr>
 <td>AIPA (full)</td>
 <td>all</td>
-<td>0.753</td>
-<td>0.659</td>
-<td>0.682</td>
-<td>0.659</td>
-<td>0.744</td>
-<td>0.299</td>
-<td>0.802</td>
-<td>0.465</td>
-<td>0.801</td>
-<td>0.930</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>natural</td>
-<td>0.728</td>
-<td>0.525</td>
-<td>0.559</td>
-<td>0.524</td>
-<td>0.725</td>
-<td>0.301</td>
-<td>0.785</td>
-<td>0.195</td>
-<td>0.410</td>
-<td>0.930</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>synthetic</td>
-<td>0.972</td>
-<td>0.594</td>
-<td>0.582</td>
-<td>0.587</td>
-<td>0.979</td>
-<td>0.000</td>
-<td>0.984</td>
-<td>0.953</td>
-<td>1.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>all</td>
-<td>0.760</td>
-<td>0.679</td>
-<td>0.681</td>
-<td>0.661</td>
-<td>0.747</td>
-<td>0.310</td>
-<td>0.811</td>
-<td>0.479</td>
-<td>0.788</td>
-<td>0.919</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>natural</td>
-<td>0.736</td>
-<td>0.539</td>
-<td>0.555</td>
-<td>0.520</td>
-<td>0.728</td>
-<td>0.311</td>
-<td>0.797</td>
-<td>0.202</td>
-<td>0.371</td>
-<td>0.919</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>synthetic</td>
-<td>0.964</td>
-<td>0.588</td>
-<td>0.577</td>
-<td>0.581</td>
-<td>0.969</td>
-<td>0.000</td>
-<td>0.969</td>
-<td>0.938</td>
-<td>1.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>all</td>
-<td>0.782</td>
-<td>0.712</td>
-<td>0.694</td>
-<td>0.691</td>
 <td>0.768</td>
-<td>0.326</td>
-<td>0.827</td>
-<td>0.541</td>
-<td>0.825</td>
-<td>0.938</td>
+<td>0.690</td>
+<td>0.699</td>
+<td>0.687</td>
+<td>0.763</td>
+<td>0.376</td>
+<td>0.808</td>
+<td>0.503</td>
+<td>0.808</td>
+<td>0.939</td>
 </tr>
 <tr>
-<td>AIPA w/o clarification</td>
+<td>AIPA (full)</td>
 <td>natural</td>
-<td>0.760</td>
-<td>0.569</td>
-<td>0.557</td>
-<td>0.550</td>
-<td>0.749</td>
-<td>0.327</td>
-<td>0.814</td>
-<td>0.274</td>
-<td>0.397</td>
-<td>0.938</td>
+<td>0.745</td>
+<td>0.554</td>
+<td>0.572</td>
+<td>0.551</td>
+<td>0.745</td>
+<td>0.377</td>
+<td>0.793</td>
+<td>0.237</td>
+<td>0.410</td>
+<td>0.939</td>
 </tr>
 <tr>
-<td>AIPA w/o clarification</td>
+<td>AIPA (full)</td>
 <td>synthetic</td>
 <td>0.972</td>
-<td>0.590</td>
+<td>0.589</td>
 <td>0.582</td>
 <td>0.585</td>
 <td>0.976</td>
 <td>0.000</td>
-<td>0.980</td>
-<td>0.953</td>
-<td>0.994</td>
+<td>0.979</td>
+<td>0.960</td>
+<td>0.987</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>all</td>
+<td>0.766</td>
+<td>0.690</td>
+<td>0.676</td>
+<td>0.669</td>
+<td>0.751</td>
+<td>0.299</td>
+<td>0.813</td>
+<td>0.490</td>
+<td>0.820</td>
+<td>0.925</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>natural</td>
+<td>0.745</td>
+<td>0.551</td>
+<td>0.553</td>
+<td>0.533</td>
+<td>0.732</td>
+<td>0.301</td>
+<td>0.800</td>
+<td>0.219</td>
+<td>0.419</td>
+<td>0.926</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>synthetic</td>
+<td>0.944</td>
+<td>0.584</td>
+<td>0.564</td>
+<td>0.572</td>
+<td>0.954</td>
+<td>0.000</td>
+<td>0.959</td>
+<td>0.901</td>
+<td>1.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>all</td>
+<td>0.767</td>
+<td>0.687</td>
+<td>0.700</td>
+<td>0.685</td>
+<td>0.760</td>
+<td>0.341</td>
+<td>0.807</td>
+<td>0.503</td>
+<td>0.831</td>
+<td>0.941</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>natural</td>
+<td>0.743</td>
+<td>0.561</td>
+<td>0.589</td>
+<td>0.561</td>
+<td>0.741</td>
+<td>0.341</td>
+<td>0.792</td>
+<td>0.242</td>
+<td>0.489</td>
+<td>0.942</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>synthetic</td>
+<td>0.972</td>
+<td>0.589</td>
+<td>0.582</td>
+<td>0.585</td>
+<td>0.976</td>
+<td>0.000</td>
+<td>0.979</td>
+<td>0.960</td>
+<td>0.987</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>all</td>
-<td>0.771</td>
+<td>0.772</td>
 <td>0.692</td>
-<td>0.687</td>
+<td>0.688</td>
 <td>0.683</td>
-<td>0.760</td>
+<td>0.762</td>
 <td>0.336</td>
-<td>0.818</td>
-<td>0.497</td>
-<td>0.838</td>
-<td>0.928</td>
+<td>0.819</td>
+<td>0.511</td>
+<td>0.820</td>
+<td>0.931</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>natural</td>
 <td>0.749</td>
-<td>0.551</td>
-<td>0.559</td>
-<td>0.546</td>
-<td>0.740</td>
-<td>0.340</td>
-<td>0.804</td>
-<td>0.203</td>
-<td>0.456</td>
-<td>0.928</td>
+<td>0.545</td>
+<td>0.550</td>
+<td>0.538</td>
+<td>0.741</td>
+<td>0.338</td>
+<td>0.805</td>
+<td>0.223</td>
+<td>0.392</td>
+<td>0.932</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>synthetic</td>
-<td>0.960</td>
+<td>0.968</td>
 <td>0.592</td>
-<td>0.574</td>
-<td>0.582</td>
-<td>0.971</td>
-<td>0.000</td>
-<td>0.979</td>
-<td>0.932</td>
-<td>1.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>all</td>
-<td>0.753</td>
-<td>0.658</td>
-<td>0.682</td>
-<td>0.659</td>
-<td>0.744</td>
-<td>0.299</td>
-<td>0.801</td>
-<td>0.464</td>
-<td>0.801</td>
-<td>0.930</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>natural</td>
-<td>0.727</td>
-<td>0.525</td>
-<td>0.559</td>
-<td>0.524</td>
-<td>0.725</td>
-<td>0.301</td>
-<td>0.785</td>
-<td>0.194</td>
-<td>0.410</td>
-<td>0.930</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>synthetic</td>
-<td>0.972</td>
-<td>0.594</td>
-<td>0.582</td>
-<td>0.587</td>
-<td>0.979</td>
-<td>0.000</td>
-<td>0.984</td>
-<td>0.953</td>
-<td>1.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>all</td>
-<td>0.767</td>
-<td>0.676</td>
-<td>0.675</td>
-<td>0.663</td>
-<td>0.750</td>
-<td>0.270</td>
-<td>0.811</td>
-<td>0.488</td>
-<td>0.804</td>
-<td>0.943</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>natural</td>
-<td>0.743</td>
-<td>0.528</td>
-<td>0.537</td>
-<td>0.516</td>
-<td>0.729</td>
-<td>0.271</td>
-<td>0.797</td>
-<td>0.183</td>
-<td>0.385</td>
-<td>0.943</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>synthetic</td>
-<td>0.972</td>
-<td>0.590</td>
-<td>0.582</td>
+<td>0.579</td>
 <td>0.585</td>
 <td>0.975</td>
 <td>0.000</td>
-<td>0.974</td>
-<td>0.953</td>
+<td>0.979</td>
+<td>0.946</td>
+<td>1.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>all</td>
+<td>0.769</td>
+<td>0.691</td>
+<td>0.700</td>
+<td>0.687</td>
+<td>0.764</td>
+<td>0.376</td>
+<td>0.809</td>
+<td>0.502</td>
+<td>0.808</td>
+<td>0.941</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>natural</td>
+<td>0.746</td>
+<td>0.555</td>
+<td>0.572</td>
+<td>0.552</td>
+<td>0.746</td>
+<td>0.378</td>
+<td>0.793</td>
+<td>0.237</td>
+<td>0.410</td>
+<td>0.941</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>synthetic</td>
+<td>0.972</td>
+<td>0.589</td>
+<td>0.582</td>
+<td>0.585</td>
+<td>0.976</td>
+<td>0.000</td>
+<td>0.979</td>
+<td>0.960</td>
+<td>0.987</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>all</td>
+<td>0.775</td>
+<td>0.697</td>
+<td>0.690</td>
+<td>0.686</td>
+<td>0.763</td>
+<td>0.345</td>
+<td>0.819</td>
+<td>0.508</td>
+<td>0.823</td>
+<td>0.933</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>natural</td>
+<td>0.752</td>
+<td>0.551</td>
+<td>0.552</td>
+<td>0.541</td>
+<td>0.744</td>
+<td>0.347</td>
+<td>0.805</td>
+<td>0.221</td>
+<td>0.399</td>
+<td>0.934</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>synthetic</td>
+<td>0.968</td>
+<td>0.592</td>
+<td>0.579</td>
+<td>0.585</td>
+<td>0.975</td>
+<td>0.000</td>
+<td>0.979</td>
+<td>0.946</td>
 <td>1.000</td>
 <td>0.000</td>
 </tr>
@@ -1321,234 +2697,138 @@
 <tr>
 <td>AIPA (full)</td>
 <td>all</td>
-<td>0.879</td>
-<td>0.589</td>
-<td>0.371</td>
-<td>0.237</td>
-<td>0.182</td>
-<td>0.984</td>
-<td>0.607</td>
-<td>0.003</td>
-<td>0.017</td>
-<td>1202.000</td>
-<td>140.000</td>
-<td>218.500</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>natural</td>
-<td>0.872</td>
-<td>0.202</td>
-<td>0.166</td>
-<td>0.134</td>
-<td>0.203</td>
-<td>0.984</td>
-<td>0.607</td>
-<td>0.003</td>
-<td>0.019</td>
-<td>1077.000</td>
-<td>62.000</td>
-<td>218.500</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>synthetic</td>
-<td>0.936</td>
-<td>0.897</td>
-<td>0.473</td>
-<td>0.256</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>n/a</td>
-<td>0.000</td>
-<td>0.000</td>
-<td>125.000</td>
-<td>78.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>all</td>
-<td>0.817</td>
-<td>0.654</td>
-<td>0.263</td>
-<td>0.219</td>
-<td>0.258</td>
-<td>0.713</td>
-<td>0.624</td>
-<td>0.074</td>
-<td>0.026</td>
-<td>1202.000</td>
-<td>140.000</td>
-<td>310.500</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>natural</td>
-<td>0.800</td>
-<td>0.298</td>
-<td>0.150</td>
-<td>0.311</td>
-<td>0.286</td>
-<td>0.718</td>
-<td>0.624</td>
-<td>0.081</td>
-<td>0.029</td>
-<td>1077.000</td>
-<td>62.000</td>
-<td>308.500</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>synthetic</td>
-<td>0.960</td>
-<td>0.936</td>
-<td>0.322</td>
-<td>0.205</td>
-<td>0.016</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>0.016</td>
-<td>0.000</td>
-<td>125.000</td>
-<td>78.000</td>
-<td>2.000</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>all</td>
-<td>0.712</td>
-<td>0.550</td>
-<td>0.355</td>
-<td>0.321</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>0.000</td>
-<td>0.000</td>
-<td>0.007</td>
-<td>1202.000</td>
-<td>140.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>natural</td>
-<td>0.688</td>
-<td>0.153</td>
-<td>0.132</td>
-<td>0.583</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>0.000</td>
-<td>0.000</td>
-<td>0.007</td>
-<td>1077.000</td>
-<td>62.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>synthetic</td>
-<td>0.916</td>
-<td>0.865</td>
-<td>0.464</td>
-<td>0.293</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>n/a</td>
-<td>0.000</td>
-<td>0.000</td>
-<td>125.000</td>
-<td>78.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>all</td>
 <td>0.889</td>
-<td>0.586</td>
-<td>0.369</td>
-<td>0.267</td>
-<td>0.178</td>
-<td>0.988</td>
-<td>0.599</td>
+<td>0.604</td>
+<td>0.376</td>
+<td>0.251</td>
+<td>0.181</td>
+<td>0.991</td>
+<td>0.607</td>
 <td>0.002</td>
-<td>0.008</td>
+<td>0.012</td>
 <td>1202.000</td>
 <td>140.000</td>
-<td>214.500</td>
+<td>217.000</td>
 </tr>
 <tr>
-<td>AIPA w/o counterfactual</td>
+<td>AIPA (full)</td>
 <td>natural</td>
-<td>0.884</td>
-<td>0.202</td>
-<td>0.168</td>
-<td>0.250</td>
-<td>0.199</td>
-<td>0.988</td>
-<td>0.599</td>
+<td>0.883</td>
+<td>0.226</td>
+<td>0.184</td>
+<td>0.312</td>
+<td>0.201</td>
+<td>0.991</td>
+<td>0.607</td>
 <td>0.002</td>
-<td>0.009</td>
+<td>0.013</td>
 <td>1077.000</td>
 <td>62.000</td>
-<td>214.500</td>
+<td>217.000</td>
 </tr>
 <tr>
-<td>AIPA w/o counterfactual</td>
+<td>AIPA (full)</td>
+<td>synthetic</td>
+<td>0.940</td>
+<td>0.904</td>
+<td>0.475</td>
+<td>0.244</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>125.000</td>
+<td>78.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>all</td>
+<td>0.831</td>
+<td>0.614</td>
+<td>0.254</td>
+<td>0.232</td>
+<td>0.260</td>
+<td>0.723</td>
+<td>0.636</td>
+<td>0.073</td>
+<td>0.019</td>
+<td>1202.000</td>
+<td>140.000</td>
+<td>312.500</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>natural</td>
+<td>0.818</td>
+<td>0.242</td>
+<td>0.128</td>
+<td>0.236</td>
+<td>0.289</td>
+<td>0.726</td>
+<td>0.636</td>
+<td>0.080</td>
+<td>0.021</td>
+<td>1077.000</td>
+<td>62.000</td>
+<td>311.000</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>synthetic</td>
+<td>0.944</td>
+<td>0.910</td>
+<td>0.318</td>
+<td>0.231</td>
+<td>0.012</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>0.012</td>
+<td>0.000</td>
+<td>125.000</td>
+<td>78.000</td>
+<td>1.500</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>all</td>
+<td>0.713</td>
+<td>0.579</td>
+<td>0.366</td>
+<td>0.250</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.012</td>
+<td>1202.000</td>
+<td>140.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>natural</td>
+<td>0.687</td>
+<td>0.185</td>
+<td>0.155</td>
+<td>0.362</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.014</td>
+<td>1077.000</td>
+<td>62.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
 <td>synthetic</td>
 <td>0.932</td>
 <td>0.891</td>
 <td>0.471</td>
-<td>0.269</td>
-<td>0.000</td>
-<td>n/a</td>
-<td>n/a</td>
-<td>0.000</td>
-<td>0.000</td>
-<td>125.000</td>
-<td>78.000</td>
-<td>0.000</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>all</td>
-<td>0.879</td>
-<td>0.589</td>
-<td>0.371</td>
 <td>0.237</td>
-<td>0.182</td>
-<td>0.984</td>
-<td>0.607</td>
-<td>0.003</td>
-<td>0.017</td>
-<td>1202.000</td>
-<td>140.000</td>
-<td>218.500</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>natural</td>
-<td>0.872</td>
-<td>0.202</td>
-<td>0.166</td>
-<td>0.134</td>
-<td>0.203</td>
-<td>0.984</td>
-<td>0.607</td>
-<td>0.003</td>
-<td>0.019</td>
-<td>1077.000</td>
-<td>62.000</td>
-<td>218.500</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>synthetic</td>
-<td>0.936</td>
-<td>0.897</td>
-<td>0.473</td>
-<td>0.256</td>
 <td>0.000</td>
 <td>n/a</td>
 <td>n/a</td>
@@ -1559,44 +2839,140 @@
 <td>0.000</td>
 </tr>
 <tr>
-<td>AIPA w/o relationship</td>
+<td>AIPA w/o counterfactual</td>
 <td>all</td>
-<td>0.886</td>
-<td>0.568</td>
-<td>0.362</td>
-<td>0.270</td>
-<td>0.183</td>
-<td>0.987</td>
-<td>0.612</td>
-<td>0.002</td>
+<td>0.894</td>
+<td>0.607</td>
+<td>0.378</td>
+<td>0.278</td>
+<td>0.177</td>
+<td>1.000</td>
+<td>0.600</td>
+<td>0.000</td>
 <td>0.010</td>
 <td>1202.000</td>
 <td>140.000</td>
-<td>219.500</td>
+<td>212.500</td>
+</tr>
+<tr>
+<td>AIPA w/o counterfactual</td>
+<td>natural</td>
+<td>0.887</td>
+<td>0.218</td>
+<td>0.179</td>
+<td>0.250</td>
+<td>0.197</td>
+<td>1.000</td>
+<td>0.600</td>
+<td>0.000</td>
+<td>0.011</td>
+<td>1077.000</td>
+<td>62.000</td>
+<td>212.500</td>
+</tr>
+<tr>
+<td>AIPA w/o counterfactual</td>
+<td>synthetic</td>
+<td>0.948</td>
+<td>0.917</td>
+<td>0.478</td>
+<td>0.282</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>125.000</td>
+<td>78.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>all</td>
+<td>0.887</td>
+<td>0.604</td>
+<td>0.376</td>
+<td>0.251</td>
+<td>0.181</td>
+<td>0.991</td>
+<td>0.607</td>
+<td>0.002</td>
+<td>0.014</td>
+<td>1202.000</td>
+<td>140.000</td>
+<td>217.000</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>natural</td>
+<td>0.881</td>
+<td>0.226</td>
+<td>0.184</td>
+<td>0.312</td>
+<td>0.201</td>
+<td>0.991</td>
+<td>0.607</td>
+<td>0.002</td>
+<td>0.015</td>
+<td>1077.000</td>
+<td>62.000</td>
+<td>217.000</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>synthetic</td>
+<td>0.940</td>
+<td>0.904</td>
+<td>0.475</td>
+<td>0.244</td>
+<td>0.000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>125.000</td>
+<td>78.000</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>all</td>
+<td>0.896</td>
+<td>0.621</td>
+<td>0.383</td>
+<td>0.261</td>
+<td>0.175</td>
+<td>1.000</td>
+<td>0.595</td>
+<td>0.000</td>
+<td>0.009</td>
+<td>1202.000</td>
+<td>140.000</td>
+<td>210.500</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>natural</td>
-<td>0.881</td>
-<td>0.161</td>
-<td>0.138</td>
-<td>0.383</td>
-<td>0.204</td>
-<td>0.987</td>
-<td>0.612</td>
-<td>0.003</td>
-<td>0.012</td>
+<td>0.890</td>
+<td>0.234</td>
+<td>0.189</td>
+<td>0.208</td>
+<td>0.195</td>
+<td>1.000</td>
+<td>0.595</td>
+<td>0.000</td>
+<td>0.010</td>
 <td>1077.000</td>
 <td>62.000</td>
-<td>219.500</td>
+<td>210.500</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>synthetic</td>
-<td>0.932</td>
-<td>0.891</td>
-<td>0.471</td>
-<td>0.256</td>
+<td>0.956</td>
+<td>0.929</td>
+<td>0.482</td>
+<td>0.269</td>
 <td>0.000</td>
 <td>n/a</td>
 <td>n/a</td>
@@ -1623,110 +2999,110 @@
 <tr>
 <td>AIPA (full)</td>
 <td>all</td>
-<td>0.047</td>
-<td>0.065</td>
+<td>0.045</td>
+<td>0.063</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>natural</td>
-<td>0.051</td>
-<td>0.072</td>
+<td>0.049</td>
+<td>0.068</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>synthetic</td>
-<td>0.084</td>
-<td>0.016</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>all</td>
-<td>0.066</td>
-<td>0.066</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>natural</td>
-<td>0.078</td>
-<td>0.073</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
-<td>synthetic</td>
-<td>0.043</td>
+<td>0.079</td>
 <td>0.017</td>
 </tr>
 <tr>
+<td>AIPA (rule policy)</td>
+<td>all</td>
+<td>0.062</td>
+<td>0.065</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>natural</td>
+<td>0.071</td>
+<td>0.071</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>synthetic</td>
+<td>0.049</td>
+<td>0.021</td>
+</tr>
+<tr>
 <td>AIPA w/o clarification</td>
 <td>all</td>
-<td>0.056</td>
-<td>0.061</td>
+<td>0.038</td>
+<td>0.062</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>natural</td>
+<td>0.041</td>
 <td>0.068</td>
-<td>0.067</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>synthetic</td>
-<td>0.054</td>
-<td>0.019</td>
+<td>0.079</td>
+<td>0.016</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>all</td>
 <td>0.041</td>
-<td>0.062</td>
+<td>0.061</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>natural</td>
 <td>0.050</td>
-<td>0.068</td>
+<td>0.066</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>synthetic</td>
-<td>0.049</td>
-<td>0.018</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>all</td>
-<td>0.044</td>
-<td>0.066</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>natural</td>
-<td>0.048</td>
-<td>0.072</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>synthetic</td>
-<td>0.084</td>
+<td>0.051</td>
 <td>0.016</td>
 </tr>
 <tr>
+<td>AIPA w/o persistence</td>
+<td>all</td>
+<td>0.043</td>
+<td>0.063</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>natural</td>
+<td>0.047</td>
+<td>0.069</td>
+</tr>
+<tr>
+<td>AIPA w/o persistence</td>
+<td>synthetic</td>
+<td>0.079</td>
+<td>0.017</td>
+</tr>
+<tr>
 <td>AIPA w/o relationship</td>
 <td>all</td>
-<td>0.036</td>
-<td>0.063</td>
+<td>0.038</td>
+<td>0.060</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>natural</td>
-<td>0.038</td>
-<td>0.068</td>
+<td>0.047</td>
+<td>0.066</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>synthetic</td>
-<td>0.076</td>
-<td>0.019</td>
+<td>0.062</td>
+<td>0.015</td>
 </tr>
 </tbody>
 </table>
@@ -1756,120 +3132,120 @@
 <td>False</td>
 <td>Complement</td>
 <td>165</td>
-<td>0.018</td>
-<td>0.049</td>
-<td>0.002</td>
-<td>0.037</td>
-<td>0.642</td>
-<td>0.161</td>
-<td>0.500</td>
+<td>0.027</td>
+<td>0.056</td>
+<td>0.004</td>
+<td>0.043</td>
+<td>0.641</td>
+<td>0.171</td>
+<td>0.476</td>
 <td>0.000</td>
-<td>0.500</td>
+<td>0.524</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>False</td>
 <td>Conflict</td>
 <td>48</td>
-<td>0.020</td>
-<td>0.030</td>
-<td>0.004</td>
-<td>0.016</td>
-<td>0.642</td>
-<td>0.142</td>
-<td>0.490</td>
-<td>0.010</td>
-<td>0.500</td>
+<td>0.025</td>
+<td>0.043</td>
+<td>-0.001</td>
+<td>0.036</td>
+<td>0.602</td>
+<td>0.161</td>
+<td>0.375</td>
+<td>0.000</td>
+<td>0.625</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>False</td>
 <td>Consistent</td>
 <td>514</td>
-<td>0.025</td>
-<td>0.051</td>
-<td>0.006</td>
-<td>0.035</td>
-<td>0.622</td>
-<td>0.238</td>
-<td>0.462</td>
-<td>0.004</td>
-<td>0.534</td>
+<td>0.029</td>
+<td>0.047</td>
+<td>0.005</td>
+<td>0.037</td>
+<td>0.589</td>
+<td>0.231</td>
+<td>0.427</td>
+<td>0.009</td>
+<td>0.564</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>False</td>
 <td>Override</td>
 <td>14</td>
-<td>0.019</td>
-<td>0.018</td>
-<td>-0.016</td>
-<td>0.018</td>
+<td>0.012</td>
+<td>0.084</td>
+<td>-0.012</td>
+<td>0.084</td>
 <td>0.739</td>
-<td>0.096</td>
-<td>0.536</td>
+<td>0.104</td>
+<td>0.607</td>
 <td>0.000</td>
-<td>0.464</td>
+<td>0.393</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>False</td>
 <td>Uncertain</td>
 <td>336</td>
-<td>0.012</td>
-<td>0.050</td>
-<td>0.000</td>
-<td>0.028</td>
-<td>0.740</td>
-<td>0.241</td>
-<td>0.598</td>
-<td>0.004</td>
-<td>0.397</td>
+<td>0.011</td>
+<td>0.049</td>
+<td>-0.002</td>
+<td>0.029</td>
+<td>0.747</td>
+<td>0.252</td>
+<td>0.631</td>
+<td>0.007</td>
+<td>0.362</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>True</td>
 <td>Conflict</td>
 <td>39</td>
-<td>0.023</td>
-<td>0.068</td>
-<td>0.014</td>
-<td>0.068</td>
-<td>0.832</td>
-<td>0.063</td>
-<td>0.731</td>
+<td>0.015</td>
+<td>0.075</td>
+<td>0.015</td>
+<td>0.075</td>
+<td>0.836</td>
+<td>0.058</td>
+<td>0.654</td>
 <td>0.000</td>
-<td>0.269</td>
+<td>0.346</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>True</td>
 <td>Consistent</td>
 <td>47</td>
-<td>0.017</td>
 <td>0.025</td>
-<td>-0.004</td>
+<td>0.035</td>
 <td>0.011</td>
-<td>0.595</td>
-<td>0.245</td>
-<td>0.500</td>
-<td>0.011</td>
-<td>0.489</td>
+<td>0.019</td>
+<td>0.577</td>
+<td>0.255</td>
+<td>0.468</td>
+<td>0.000</td>
+<td>0.532</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>True</td>
 <td>Override</td>
 <td>39</td>
-<td>0.026</td>
-<td>0.134</td>
+<td>0.022</td>
+<td>0.114</td>
 <td>-0.001</td>
-<td>0.134</td>
-<td>0.887</td>
-<td>0.063</td>
-<td>0.667</td>
+<td>0.114</td>
+<td>0.878</td>
+<td>0.041</td>
+<td>0.705</td>
 <td>0.000</td>
-<td>0.333</td>
+<td>0.295</td>
 <td>0.000</td>
 </tr>
 </tbody>
@@ -1894,235 +3270,235 @@
 <tr>
 <td>AIPA (full)</td>
 <td>all</td>
-<td>0.524</td>
-<td>0.004</td>
-<td>0.472</td>
+<td>0.509</td>
+<td>0.006</td>
+<td>0.485</td>
 <td>0.000</td>
-<td>0.538</td>
-<td>0.864</td>
-<td>0.462</td>
-<td>0.136</td>
+<td>0.547</td>
+<td>0.866</td>
+<td>0.453</td>
+<td>0.134</td>
 <td>1202.000</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>natural</td>
-<td>0.513</td>
-<td>0.004</td>
-<td>0.484</td>
+<td>0.498</td>
+<td>0.006</td>
+<td>0.495</td>
 <td>0.000</td>
-<td>0.537</td>
-<td>0.859</td>
-<td>0.463</td>
-<td>0.141</td>
+<td>0.545</td>
+<td>0.861</td>
+<td>0.455</td>
+<td>0.139</td>
 <td>1077.000</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>synthetic</td>
-<td>0.624</td>
-<td>0.004</td>
-<td>0.372</td>
+<td>0.600</td>
 <td>0.000</td>
-<td>0.541</td>
-<td>0.908</td>
-<td>0.459</td>
-<td>0.092</td>
+<td>0.400</td>
+<td>0.000</td>
+<td>0.562</td>
+<td>0.909</td>
+<td>0.438</td>
+<td>0.091</td>
 <td>125.000</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>all</td>
-<td>0.485</td>
-<td>0.007</td>
-<td>0.509</td>
+<td>0.483</td>
+<td>0.003</td>
+<td>0.514</td>
 <td>0.000</td>
-<td>0.578</td>
-<td>0.885</td>
-<td>0.422</td>
-<td>0.115</td>
+<td>0.574</td>
+<td>0.884</td>
+<td>0.426</td>
+<td>0.116</td>
 <td>1202.000</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>natural</td>
 <td>0.475</td>
-<td>0.006</td>
-<td>0.518</td>
+<td>0.003</td>
+<td>0.521</td>
 <td>0.000</td>
-<td>0.577</td>
-<td>0.881</td>
-<td>0.423</td>
-<td>0.119</td>
+<td>0.572</td>
+<td>0.880</td>
+<td>0.428</td>
+<td>0.120</td>
 <td>1077.000</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>synthetic</td>
-<td>0.564</td>
+<td>0.548</td>
+<td>0.000</td>
+<td>0.452</td>
+<td>0.000</td>
+<td>0.596</td>
+<td>0.916</td>
+<td>0.404</td>
+<td>0.084</td>
+<td>125.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>all</td>
+<td>0.524</td>
 <td>0.008</td>
+<td>0.468</td>
+<td>0.000</td>
+<td>0.546</td>
+<td>0.875</td>
+<td>0.454</td>
+<td>0.125</td>
+<td>1202.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>natural</td>
+<td>0.515</td>
+<td>0.009</td>
+<td>0.476</td>
+<td>0.000</td>
+<td>0.545</td>
+<td>0.871</td>
+<td>0.455</td>
+<td>0.129</td>
+<td>1077.000</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>synthetic</td>
+<td>0.604</td>
+<td>0.000</td>
+<td>0.396</td>
+<td>0.000</td>
+<td>0.562</td>
+<td>0.913</td>
+<td>0.438</td>
+<td>0.087</td>
+<td>125.000</td>
+</tr>
+<tr>
+<td>AIPA w/o counterfactual</td>
+<td>all</td>
+<td>0.472</td>
+<td>0.005</td>
+<td>0.523</td>
+<td>0.000</td>
+<td>0.576</td>
+<td>0.881</td>
+<td>0.424</td>
+<td>0.119</td>
+<td>1202.000</td>
+</tr>
+<tr>
+<td>AIPA w/o counterfactual</td>
+<td>natural</td>
+<td>0.461</td>
+<td>0.005</td>
+<td>0.534</td>
+<td>0.000</td>
+<td>0.574</td>
+<td>0.875</td>
+<td>0.426</td>
+<td>0.125</td>
+<td>1077.000</td>
+</tr>
+<tr>
+<td>AIPA w/o counterfactual</td>
+<td>synthetic</td>
+<td>0.568</td>
+<td>0.004</td>
 <td>0.428</td>
 <td>0.000</td>
-<td>0.589</td>
-<td>0.914</td>
-<td>0.411</td>
-<td>0.086</td>
+<td>0.591</td>
+<td>0.928</td>
+<td>0.409</td>
+<td>0.072</td>
 <td>125.000</td>
 </tr>
 <tr>
-<td>AIPA w/o clarification</td>
+<td>AIPA w/o persistence</td>
 <td>all</td>
-<td>0.402</td>
+<td>0.508</td>
 <td>0.006</td>
-<td>0.592</td>
+<td>0.486</td>
 <td>0.000</td>
-<td>0.616</td>
-<td>0.883</td>
-<td>0.384</td>
-<td>0.117</td>
+<td>0.547</td>
+<td>0.866</td>
+<td>0.453</td>
+<td>0.134</td>
 <td>1202.000</td>
 </tr>
 <tr>
-<td>AIPA w/o clarification</td>
+<td>AIPA w/o persistence</td>
 <td>natural</td>
-<td>0.396</td>
+<td>0.497</td>
 <td>0.006</td>
-<td>0.598</td>
+<td>0.496</td>
 <td>0.000</td>
-<td>0.614</td>
-<td>0.878</td>
-<td>0.386</td>
-<td>0.122</td>
-<td>1077.000</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>synthetic</td>
-<td>0.456</td>
-<td>0.008</td>
-<td>0.536</td>
-<td>0.000</td>
-<td>0.634</td>
-<td>0.921</td>
-<td>0.366</td>
-<td>0.079</td>
-<td>125.000</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>all</td>
-<td>0.466</td>
-<td>0.007</td>
-<td>0.526</td>
-<td>0.000</td>
-<td>0.586</td>
-<td>0.883</td>
-<td>0.414</td>
-<td>0.117</td>
-<td>1202.000</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>natural</td>
-<td>0.452</td>
-<td>0.008</td>
-<td>0.540</td>
-<td>0.000</td>
-<td>0.585</td>
-<td>0.878</td>
-<td>0.415</td>
-<td>0.122</td>
-<td>1077.000</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>synthetic</td>
-<td>0.588</td>
-<td>0.004</td>
-<td>0.408</td>
-<td>0.000</td>
-<td>0.595</td>
-<td>0.924</td>
-<td>0.405</td>
-<td>0.076</td>
-<td>125.000</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>all</td>
-<td>0.526</td>
-<td>0.004</td>
-<td>0.470</td>
-<td>0.000</td>
-<td>0.538</td>
-<td>0.864</td>
-<td>0.462</td>
-<td>0.136</td>
-<td>1202.000</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>natural</td>
-<td>0.514</td>
-<td>0.004</td>
-<td>0.482</td>
-<td>0.000</td>
-<td>0.538</td>
-<td>0.859</td>
-<td>0.462</td>
-<td>0.141</td>
-<td>1077.000</td>
-</tr>
-<tr>
-<td>AIPA w/o persistence</td>
-<td>synthetic</td>
-<td>0.624</td>
-<td>0.004</td>
-<td>0.372</td>
-<td>0.000</td>
-<td>0.541</td>
-<td>0.908</td>
-<td>0.459</td>
-<td>0.092</td>
-<td>125.000</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>all</td>
-<td>0.465</td>
-<td>0.004</td>
-<td>0.530</td>
-<td>0.000</td>
-<td>0.558</td>
-<td>0.858</td>
-<td>0.442</td>
-<td>0.142</td>
-<td>1202.000</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>natural</td>
-<td>0.451</td>
-<td>0.005</td>
 <td>0.545</td>
-<td>0.000</td>
-<td>0.557</td>
-<td>0.852</td>
-<td>0.443</td>
-<td>0.148</td>
+<td>0.860</td>
+<td>0.455</td>
+<td>0.140</td>
 <td>1077.000</td>
 </tr>
 <tr>
-<td>AIPA w/o relationship</td>
+<td>AIPA w/o persistence</td>
 <td>synthetic</td>
-<td>0.592</td>
+<td>0.600</td>
 <td>0.000</td>
-<td>0.408</td>
+<td>0.400</td>
+<td>0.000</td>
+<td>0.562</td>
+<td>0.909</td>
+<td>0.438</td>
+<td>0.091</td>
+<td>125.000</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>all</td>
+<td>0.475</td>
+<td>0.005</td>
+<td>0.521</td>
+<td>0.000</td>
+<td>0.572</td>
+<td>0.882</td>
+<td>0.428</td>
+<td>0.118</td>
+<td>1202.000</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>natural</td>
+<td>0.463</td>
+<td>0.005</td>
+<td>0.532</td>
 <td>0.000</td>
 <td>0.570</td>
-<td>0.916</td>
+<td>0.876</td>
 <td>0.430</td>
-<td>0.084</td>
+<td>0.124</td>
+<td>1077.000</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>synthetic</td>
+<td>0.572</td>
+<td>0.004</td>
+<td>0.424</td>
+<td>0.000</td>
+<td>0.592</td>
+<td>0.930</td>
+<td>0.408</td>
+<td>0.070</td>
 <td>125.000</td>
 </tr>
 </tbody>
@@ -2138,17 +3514,17 @@
 <tbody>
 <tr>
 <td>False</td>
-<td>0.456</td>
+<td>0.485</td>
 </tr>
 <tr>
 <td>True</td>
-<td>0.620</td>
+<td>0.636</td>
 </tr>
 </tbody>
 </table>
 <p><img alt="counterfactual" src="../figures/fig08_counterfactual.png" /></p>
 <h2>7. Temporary override vs. persistent preference shift</h2>
-<p>Persistent shifts detected on the test set (genre prioritised in ≥ 2 distinct sessions of a seeker): <strong>33</strong> across 2 seed(s).</p>
+<p>The tracker is replayed in chronological order per seeker over the natural test dialogues (<code>conversationId</code>, then turn). Persistent shifts detected on the test set (genre prioritised in ≥ 2 distinct sessions of a seeker): <strong>52</strong> across 2 seed(s).</p>
 <table>
 <thead>
 <tr>
@@ -2170,6 +3546,20 @@
 <tr>
 <td>AIPA w/o relationship</td>
 <td>42</td>
+<td>1035</td>
+<td>Comedy</td>
+<td>22801</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>42</td>
+<td>1046</td>
+<td>Musical</td>
+<td>22865</td>
+</tr>
+<tr>
+<td>AIPA w/o relationship</td>
+<td>42</td>
 <td>1087</td>
 <td>War</td>
 <td>22841</td>
@@ -2183,122 +3573,284 @@
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
-<td>42</td>
-<td>1087</td>
-<td>War</td>
-<td>22841</td>
-</tr>
-<tr>
-<td>AIPA w/o clarification</td>
-<td>42</td>
-<td>1087</td>
-<td>War</td>
-<td>22841</td>
-</tr>
-<tr>
-<td>AIPA (rule policy)</td>
 <td>42</td>
 <td>1035</td>
 <td>Comedy</td>
 <td>22801</td>
 </tr>
 <tr>
-<td>AIPA (rule policy)</td>
+<td>AIPA w/o counterfactual</td>
 <td>42</td>
 <td>1087</td>
 <td>War</td>
 <td>22841</td>
 </tr>
 <tr>
-<td>AIPA (full)</td>
+<td>AIPA w/o counterfactual</td>
 <td>42</td>
-<td>1008</td>
-<td>Horror</td>
-<td>21026</td>
+<td>959</td>
+<td>Romance</td>
+<td>22159</td>
 </tr>
 <tr>
-<td>AIPA (full)</td>
+<td>AIPA w/o clarification</td>
+<td>42</td>
+<td>1011</td>
+<td>Horror</td>
+<td>21073</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
 <td>42</td>
 <td>1034</td>
 <td>Comedy</td>
 <td>22026</td>
 </tr>
 <tr>
-<td>AIPA (full)</td>
+<td>AIPA w/o clarification</td>
 <td>42</td>
 <td>1035</td>
 <td>Comedy</td>
 <td>22801</td>
 </tr>
 <tr>
-<td>AIPA (full)</td>
+<td>AIPA w/o clarification</td>
 <td>42</td>
 <td>1054</td>
 <td>Comedy</td>
 <td>22083</td>
 </tr>
 <tr>
-<td>AIPA (full)</td>
+<td>AIPA w/o clarification</td>
 <td>42</td>
-<td>1059</td>
-<td>Crime</td>
-<td>23195</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>42</td>
-<td>1087</td>
-<td>War</td>
-<td>22841</td>
-</tr>
-<tr>
-<td>AIPA (full)</td>
-<td>42</td>
-<td>979</td>
-<td>Musical</td>
-<td>21644</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>7</td>
-<td>1008</td>
-<td>Horror</td>
-<td>21026</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>7</td>
-<td>1011</td>
-<td>Horror</td>
-<td>21073</td>
-</tr>
-<tr>
-<td>AIPA w/o relationship</td>
-<td>7</td>
-<td>1087</td>
-<td>War</td>
-<td>22841</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>7</td>
-<td>1034</td>
-<td>Comedy</td>
-<td>22026</td>
-</tr>
-<tr>
-<td>AIPA w/o counterfactual</td>
-<td>7</td>
 <td>1087</td>
 <td>War</td>
 <td>22841</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
-<td>7</td>
+<td>42</td>
+<td>959</td>
+<td>Romance</td>
+<td>22159</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>42</td>
+<td>972</td>
+<td>Comedy</td>
+<td>22348</td>
+</tr>
+<tr>
+<td>AIPA w/o clarification</td>
+<td>42</td>
+<td>979</td>
+<td>Musical</td>
+<td>21644</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>42</td>
 <td>1035</td>
 <td>Comedy</td>
-<td>22036</td>
+<td>22801</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>42</td>
+<td>1087</td>
+<td>War</td>
+<td>22841</td>
+</tr>
+<tr>
+<td>AIPA (rule policy)</td>
+<td>42</td>
+<td>959</td>
+<td>Romance</td>
+<td>22159</td>
+</tr>
+<tr>
+<td>AIPA (full)</td>
+<td>42</td>
+<td>1008</td>
+<td>Horror</td>
+<td>21026</td>
+</tr>
+</tbody>
+</table>
+<p>Effect of the tracker (AIPA (full) vs AIPA w/o persistence, Hit@10) on all natural instances, on instances of seekers with &gt;= 3 test sessions, and on the instances whose LTP prior the tracker actually changed:</p>
+<table>
+<thead>
+<tr>
+<th>subset</th>
+<th>n</th>
+<th>n_seekers</th>
+<th>persistence_k</th>
+<th>n_shifts_mean</th>
+<th>hit10_full</th>
+<th>hit10_without</th>
+<th>mean_diff</th>
+<th>t_p</th>
+<th>wilcoxon_p</th>
+<th>perm_p</th>
+<th>n_pairs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>natural</td>
+<td>1077</td>
+<td>57</td>
+<td>2</td>
+<td>6.0000</td>
+<td>0.0929</td>
+<td>0.0929</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>2154</td>
+</tr>
+<tr>
+<td>seekers_with_ge3_sessions</td>
+<td>946</td>
+<td>29</td>
+<td>2</td>
+<td>6.0000</td>
+<td>0.0951</td>
+<td>0.0951</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>1892</td>
+</tr>
+<tr>
+<td>tracker_affected</td>
+<td>87</td>
+<td>8</td>
+<td>2</td>
+<td>6.0000</td>
+<td>0.1092</td>
+<td>0.1092</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>174</td>
+</tr>
+</tbody>
+</table>
+<p>The tracker changed 87 instance(s) but the Hit@10 difference on that subset is not significant; no persistence effect is claimed.</p>
+<p><code>persistence_k</code> sweep over [1, 2, 3] (validation split for selection; the test rows are reported for transparency only and were not used to choose k = 2):</p>
+<table>
+<thead>
+<tr>
+<th>split</th>
+<th>k</th>
+<th>seeds</th>
+<th>n_shifts_mean</th>
+<th>n_seekers_shifted_mean</th>
+<th>n_multi_session_mean</th>
+<th>n_affected_mean</th>
+<th>hit10_multi_without_mean</th>
+<th>hit10_multi_with_mean</th>
+<th>hit10_multi_delta_mean</th>
+<th>hit10_affected_without_mean</th>
+<th>hit10_affected_with_mean</th>
+<th>n_rank_changed_mean</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>test</td>
+<td>1</td>
+<td>2</td>
+<td>54.5000</td>
+<td>37.0000</td>
+<td>946.0000</td>
+<td>542.0000</td>
+<td>0.0951</td>
+<td>0.0962</td>
+<td>0.0011</td>
+<td>0.0870</td>
+<td>0.0878</td>
+<td>481.5000</td>
+</tr>
+<tr>
+<td>test</td>
+<td>2</td>
+<td>2</td>
+<td>6.0000</td>
+<td>6.0000</td>
+<td>946.0000</td>
+<td>77.0000</td>
+<td>0.0951</td>
+<td>0.0951</td>
+<td>0.0000</td>
+<td>0.1176</td>
+<td>0.1176</td>
+<td>68.0000</td>
+</tr>
+<tr>
+<td>test</td>
+<td>3</td>
+<td>2</td>
+<td>0.5000</td>
+<td>0.5000</td>
+<td>946.0000</td>
+<td>1.5000</td>
+<td>0.0951</td>
+<td>0.0951</td>
+<td>0.0000</td>
+<td>0.3333</td>
+<td>0.3333</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>valid</td>
+<td>1</td>
+<td>2</td>
+<td>34.0000</td>
+<td>31.5000</td>
+<td>266.0000</td>
+<td>135.5000</td>
+<td>0.0959</td>
+<td>0.0977</td>
+<td>0.0019</td>
+<td>0.0978</td>
+<td>0.1106</td>
+<td>115.5000</td>
+</tr>
+<tr>
+<td>valid</td>
+<td>2</td>
+<td>2</td>
+<td>1.0000</td>
+<td>1.0000</td>
+<td>266.0000</td>
+<td>2.0000</td>
+<td>0.0959</td>
+<td>0.0959</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>valid</td>
+<td>3</td>
+<td>2</td>
+<td>0.0000</td>
+<td>0.0000</td>
+<td>266.0000</td>
+<td>0.0000</td>
+<td>0.0959</td>
+<td>0.0959</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>0.0000</td>
 </tr>
 </tbody>
 </table>
@@ -2321,55 +3873,1771 @@
 </thead>
 <tbody>
 <tr>
-<td>0-2</td>
+<td>cold</td>
 <td>110</td>
 <td>0.114</td>
 <td>0.114</td>
-<td>0.061</td>
-<td>0.045</td>
+<td>0.064</td>
+<td>0.048</td>
 <td>0.150</td>
 <td>0.150</td>
-<td>0.070</td>
-<td>0.048</td>
+<td>0.072</td>
+<td>0.051</td>
 </tr>
 <tr>
-<td>3-10</td>
-<td>81</td>
-<td>0.105</td>
-<td>0.105</td>
-<td>0.061</td>
-<td>0.048</td>
-<td>0.142</td>
-<td>0.142</td>
-<td>0.071</td>
-<td>0.050</td>
+<td>short</td>
+<td>69</td>
+<td>0.109</td>
+<td>0.109</td>
+<td>0.054</td>
+<td>0.038</td>
+<td>0.130</td>
+<td>0.130</td>
+<td>0.060</td>
+<td>0.040</td>
 </tr>
 <tr>
-<td>11-25</td>
-<td>124</td>
-<td>0.077</td>
-<td>0.077</td>
-<td>0.053</td>
+<td>mid</td>
+<td>132</td>
+<td>0.076</td>
+<td>0.076</td>
 <td>0.046</td>
-<td>0.133</td>
-<td>0.133</td>
-<td>0.067</td>
-<td>0.050</td>
+<td>0.037</td>
+<td>0.129</td>
+<td>0.129</td>
+<td>0.059</td>
+<td>0.040</td>
 </tr>
 <tr>
-<td>26-50</td>
-<td>762</td>
-<td>0.085</td>
-<td>0.085</td>
-<td>0.048</td>
-<td>0.037</td>
-<td>0.141</td>
-<td>0.141</td>
-<td>0.062</td>
-<td>0.041</td>
+<td>long</td>
+<td>766</td>
+<td>0.091</td>
+<td>0.091</td>
+<td>0.052</td>
+<td>0.040</td>
+<td>0.136</td>
+<td>0.136</td>
+<td>0.063</td>
+<td>0.043</td>
 </tr>
 </tbody>
 </table>
+<h3>History-length buckets - Hit@10 of every model (natural; mean ± std over seeds)</h3>
+<table>
+<thead>
+<tr>
+<th>history_bucket</th>
+<th>model</th>
+<th>n</th>
+<th>seeds</th>
+<th>Hit@10_mean</th>
+<th>Hit@10_std</th>
+<th>NDCG@10_mean</th>
+<th>NDCG@10_std</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cold</td>
+<td>LTP-only</td>
+<td>110</td>
+<td>2</td>
+<td>0.068</td>
+<td>0.014</td>
+<td>0.035</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>STI-only</td>
+<td>110</td>
+<td>2</td>
+<td>0.123</td>
+<td>0.005</td>
+<td>0.069</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>Naive fusion</td>
+<td>110</td>
+<td>2</td>
+<td>0.100</td>
+<td>0.009</td>
+<td>0.061</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>Adaptive fusion</td>
+<td>110</td>
+<td>2</td>
+<td>0.123</td>
+<td>0.005</td>
+<td>0.071</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>Sequential (GRU)</td>
+<td>110</td>
+<td>2</td>
+<td>0.064</td>
+<td>0.000</td>
+<td>0.036</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>Conversation-aware</td>
+<td>110</td>
+<td>2</td>
+<td>0.114</td>
+<td>0.005</td>
+<td>0.057</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>SASRec</td>
+<td>110</td>
+<td>2</td>
+<td>0.055</td>
+<td>0.000</td>
+<td>0.027</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>KBRD-style</td>
+<td>110</td>
+<td>2</td>
+<td>0.150</td>
+<td>0.005</td>
+<td>0.081</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA w/o relationship</td>
+<td>110</td>
+<td>2</td>
+<td>0.123</td>
+<td>0.005</td>
+<td>0.068</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA w/o counterfactual</td>
+<td>110</td>
+<td>2</td>
+<td>0.127</td>
+<td>0.009</td>
+<td>0.066</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA w/o clarification</td>
+<td>110</td>
+<td>2</td>
+<td>0.114</td>
+<td>0.014</td>
+<td>0.066</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA w/o persistence</td>
+<td>110</td>
+<td>2</td>
+<td>0.114</td>
+<td>0.014</td>
+<td>0.064</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA (rule policy)</td>
+<td>110</td>
+<td>2</td>
+<td>0.118</td>
+<td>0.000</td>
+<td>0.075</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>cold</td>
+<td>AIPA (full)</td>
+<td>110</td>
+<td>2</td>
+<td>0.114</td>
+<td>0.014</td>
+<td>0.064</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>short</td>
+<td>LTP-only</td>
+<td>69</td>
+<td>2</td>
+<td>0.051</td>
+<td>0.036</td>
+<td>0.018</td>
+<td>0.013</td>
+</tr>
+<tr>
+<td>short</td>
+<td>STI-only</td>
+<td>69</td>
+<td>2</td>
+<td>0.109</td>
+<td>0.007</td>
+<td>0.052</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>short</td>
+<td>Naive fusion</td>
+<td>69</td>
+<td>2</td>
+<td>0.087</td>
+<td>0.000</td>
+<td>0.046</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>short</td>
+<td>Adaptive fusion</td>
+<td>69</td>
+<td>2</td>
+<td>0.087</td>
+<td>0.000</td>
+<td>0.043</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>short</td>
+<td>Sequential (GRU)</td>
+<td>69</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.022</td>
+<td>0.048</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>short</td>
+<td>Conversation-aware</td>
+<td>69</td>
+<td>2</td>
+<td>0.109</td>
+<td>0.007</td>
+<td>0.061</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>short</td>
+<td>SASRec</td>
+<td>69</td>
+<td>2</td>
+<td>0.072</td>
+<td>0.014</td>
+<td>0.031</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>short</td>
+<td>KBRD-style</td>
+<td>69</td>
+<td>2</td>
+<td>0.087</td>
+<td>0.029</td>
+<td>0.050</td>
+<td>0.013</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA w/o relationship</td>
+<td>69</td>
+<td>2</td>
+<td>0.123</td>
+<td>0.036</td>
+<td>0.059</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA w/o counterfactual</td>
+<td>69</td>
+<td>2</td>
+<td>0.123</td>
+<td>0.036</td>
+<td>0.059</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA w/o clarification</td>
+<td>69</td>
+<td>2</td>
+<td>0.101</td>
+<td>0.014</td>
+<td>0.051</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA w/o persistence</td>
+<td>69</td>
+<td>2</td>
+<td>0.109</td>
+<td>0.022</td>
+<td>0.054</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA (rule policy)</td>
+<td>69</td>
+<td>2</td>
+<td>0.043</td>
+<td>0.014</td>
+<td>0.027</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>short</td>
+<td>AIPA (full)</td>
+<td>69</td>
+<td>2</td>
+<td>0.109</td>
+<td>0.022</td>
+<td>0.054</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>LTP-only</td>
+<td>132</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.011</td>
+<td>0.035</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>STI-only</td>
+<td>132</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.004</td>
+<td>0.046</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>Naive fusion</td>
+<td>132</td>
+<td>2</td>
+<td>0.087</td>
+<td>0.011</td>
+<td>0.045</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>Adaptive fusion</td>
+<td>132</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.011</td>
+<td>0.053</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>Sequential (GRU)</td>
+<td>132</td>
+<td>2</td>
+<td>0.076</td>
+<td>0.015</td>
+<td>0.047</td>
+<td>0.017</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>Conversation-aware</td>
+<td>132</td>
+<td>2</td>
+<td>0.061</td>
+<td>0.000</td>
+<td>0.040</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>SASRec</td>
+<td>132</td>
+<td>2</td>
+<td>0.061</td>
+<td>0.008</td>
+<td>0.033</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>KBRD-style</td>
+<td>132</td>
+<td>2</td>
+<td>0.087</td>
+<td>0.011</td>
+<td>0.049</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA w/o relationship</td>
+<td>132</td>
+<td>2</td>
+<td>0.095</td>
+<td>0.011</td>
+<td>0.049</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA w/o counterfactual</td>
+<td>132</td>
+<td>2</td>
+<td>0.095</td>
+<td>0.011</td>
+<td>0.050</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA w/o clarification</td>
+<td>132</td>
+<td>2</td>
+<td>0.076</td>
+<td>0.015</td>
+<td>0.045</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA w/o persistence</td>
+<td>132</td>
+<td>2</td>
+<td>0.076</td>
+<td>0.015</td>
+<td>0.046</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA (rule policy)</td>
+<td>132</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.019</td>
+<td>0.049</td>
+<td>0.012</td>
+</tr>
+<tr>
+<td>mid</td>
+<td>AIPA (full)</td>
+<td>132</td>
+<td>2</td>
+<td>0.076</td>
+<td>0.015</td>
+<td>0.046</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>long</td>
+<td>LTP-only</td>
+<td>766</td>
+<td>2</td>
+<td>0.050</td>
+<td>0.002</td>
+<td>0.029</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>long</td>
+<td>STI-only</td>
+<td>766</td>
+<td>2</td>
+<td>0.095</td>
+<td>0.006</td>
+<td>0.051</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>long</td>
+<td>Naive fusion</td>
+<td>766</td>
+<td>2</td>
+<td>0.093</td>
+<td>0.004</td>
+<td>0.049</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>long</td>
+<td>Adaptive fusion</td>
+<td>766</td>
+<td>2</td>
+<td>0.093</td>
+<td>0.001</td>
+<td>0.052</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>long</td>
+<td>Sequential (GRU)</td>
+<td>766</td>
+<td>2</td>
+<td>0.063</td>
+<td>0.007</td>
+<td>0.034</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>long</td>
+<td>Conversation-aware</td>
+<td>766</td>
+<td>2</td>
+<td>0.072</td>
+<td>0.002</td>
+<td>0.040</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>long</td>
+<td>SASRec</td>
+<td>766</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.003</td>
+<td>0.032</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>long</td>
+<td>KBRD-style</td>
+<td>766</td>
+<td>2</td>
+<td>0.095</td>
+<td>0.004</td>
+<td>0.049</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA w/o relationship</td>
+<td>766</td>
+<td>2</td>
+<td>0.102</td>
+<td>0.003</td>
+<td>0.053</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA w/o counterfactual</td>
+<td>766</td>
+<td>2</td>
+<td>0.099</td>
+<td>0.003</td>
+<td>0.052</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA w/o clarification</td>
+<td>766</td>
+<td>2</td>
+<td>0.088</td>
+<td>0.002</td>
+<td>0.050</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA w/o persistence</td>
+<td>766</td>
+<td>2</td>
+<td>0.091</td>
+<td>0.003</td>
+<td>0.052</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA (rule policy)</td>
+<td>766</td>
+<td>2</td>
+<td>0.089</td>
+<td>0.008</td>
+<td>0.050</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>long</td>
+<td>AIPA (full)</td>
+<td>766</td>
+<td>2</td>
+<td>0.091</td>
+<td>0.003</td>
+<td>0.052</td>
+<td>0.000</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="history buckets" src="../figures/fig09b_history_buckets.png" /></p>
+<h3>Target genre (top-8) - Hit@10 of every model (natural; mean ± std over seeds)</h3>
+<table>
+<thead>
+<tr>
+<th>target_genre</th>
+<th>model</th>
+<th>n</th>
+<th>seeds</th>
+<th>Hit@10_mean</th>
+<th>Hit@10_std</th>
+<th>NDCG@10_mean</th>
+<th>NDCG@10_std</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Action</td>
+<td>LTP-only</td>
+<td>327</td>
+<td>2</td>
+<td>0.092</td>
+<td>0.006</td>
+<td>0.057</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>STI-only</td>
+<td>327</td>
+<td>2</td>
+<td>0.157</td>
+<td>0.002</td>
+<td>0.087</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Naive fusion</td>
+<td>327</td>
+<td>2</td>
+<td>0.159</td>
+<td>0.006</td>
+<td>0.090</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Adaptive fusion</td>
+<td>327</td>
+<td>2</td>
+<td>0.151</td>
+<td>0.002</td>
+<td>0.091</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Sequential (GRU)</td>
+<td>327</td>
+<td>2</td>
+<td>0.098</td>
+<td>0.012</td>
+<td>0.056</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Conversation-aware</td>
+<td>327</td>
+<td>2</td>
+<td>0.127</td>
+<td>0.017</td>
+<td>0.072</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>SASRec</td>
+<td>327</td>
+<td>2</td>
+<td>0.084</td>
+<td>0.008</td>
+<td>0.053</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>KBRD-style</td>
+<td>327</td>
+<td>2</td>
+<td>0.170</td>
+<td>0.002</td>
+<td>0.088</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA w/o relationship</td>
+<td>327</td>
+<td>2</td>
+<td>0.164</td>
+<td>0.002</td>
+<td>0.093</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA w/o counterfactual</td>
+<td>327</td>
+<td>2</td>
+<td>0.167</td>
+<td>0.002</td>
+<td>0.094</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA w/o clarification</td>
+<td>327</td>
+<td>2</td>
+<td>0.148</td>
+<td>0.014</td>
+<td>0.091</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA w/o persistence</td>
+<td>327</td>
+<td>2</td>
+<td>0.150</td>
+<td>0.012</td>
+<td>0.093</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA (rule policy)</td>
+<td>327</td>
+<td>2</td>
+<td>0.133</td>
+<td>0.008</td>
+<td>0.076</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>AIPA (full)</td>
+<td>327</td>
+<td>2</td>
+<td>0.150</td>
+<td>0.012</td>
+<td>0.093</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>LTP-only</td>
+<td>229</td>
+<td>2</td>
+<td>0.151</td>
+<td>0.024</td>
+<td>0.091</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>STI-only</td>
+<td>229</td>
+<td>2</td>
+<td>0.221</td>
+<td>0.011</td>
+<td>0.127</td>
+<td>0.014</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>Naive fusion</td>
+<td>229</td>
+<td>2</td>
+<td>0.210</td>
+<td>0.017</td>
+<td>0.124</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>Adaptive fusion</td>
+<td>229</td>
+<td>2</td>
+<td>0.229</td>
+<td>0.002</td>
+<td>0.143</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>Sequential (GRU)</td>
+<td>229</td>
+<td>2</td>
+<td>0.177</td>
+<td>0.011</td>
+<td>0.107</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>Conversation-aware</td>
+<td>229</td>
+<td>2</td>
+<td>0.203</td>
+<td>0.002</td>
+<td>0.119</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>SASRec</td>
+<td>229</td>
+<td>2</td>
+<td>0.153</td>
+<td>0.000</td>
+<td>0.094</td>
+<td>0.014</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>KBRD-style</td>
+<td>229</td>
+<td>2</td>
+<td>0.236</td>
+<td>0.000</td>
+<td>0.133</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA w/o relationship</td>
+<td>229</td>
+<td>2</td>
+<td>0.236</td>
+<td>0.013</td>
+<td>0.139</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA w/o counterfactual</td>
+<td>229</td>
+<td>2</td>
+<td>0.234</td>
+<td>0.011</td>
+<td>0.138</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA w/o clarification</td>
+<td>229</td>
+<td>2</td>
+<td>0.212</td>
+<td>0.002</td>
+<td>0.137</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA w/o persistence</td>
+<td>229</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.009</td>
+<td>0.140</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA (rule policy)</td>
+<td>229</td>
+<td>2</td>
+<td>0.203</td>
+<td>0.011</td>
+<td>0.129</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Adventure</td>
+<td>AIPA (full)</td>
+<td>229</td>
+<td>2</td>
+<td>0.214</td>
+<td>0.009</td>
+<td>0.140</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>LTP-only</td>
+<td>391</td>
+<td>2</td>
+<td>0.018</td>
+<td>0.005</td>
+<td>0.008</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>STI-only</td>
+<td>391</td>
+<td>2</td>
+<td>0.074</td>
+<td>0.005</td>
+<td>0.034</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>Naive fusion</td>
+<td>391</td>
+<td>2</td>
+<td>0.066</td>
+<td>0.003</td>
+<td>0.030</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>Adaptive fusion</td>
+<td>391</td>
+<td>2</td>
+<td>0.063</td>
+<td>0.004</td>
+<td>0.032</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>Sequential (GRU)</td>
+<td>391</td>
+<td>2</td>
+<td>0.037</td>
+<td>0.004</td>
+<td>0.017</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>Conversation-aware</td>
+<td>391</td>
+<td>2</td>
+<td>0.050</td>
+<td>0.017</td>
+<td>0.021</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>SASRec</td>
+<td>391</td>
+<td>2</td>
+<td>0.033</td>
+<td>0.000</td>
+<td>0.015</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>KBRD-style</td>
+<td>391</td>
+<td>2</td>
+<td>0.083</td>
+<td>0.001</td>
+<td>0.038</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA w/o relationship</td>
+<td>391</td>
+<td>2</td>
+<td>0.090</td>
+<td>0.005</td>
+<td>0.042</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA w/o counterfactual</td>
+<td>391</td>
+<td>2</td>
+<td>0.083</td>
+<td>0.001</td>
+<td>0.040</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA w/o clarification</td>
+<td>391</td>
+<td>2</td>
+<td>0.061</td>
+<td>0.005</td>
+<td>0.028</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA w/o persistence</td>
+<td>391</td>
+<td>2</td>
+<td>0.068</td>
+<td>0.004</td>
+<td>0.031</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA (rule policy)</td>
+<td>391</td>
+<td>2</td>
+<td>0.075</td>
+<td>0.009</td>
+<td>0.036</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Comedy</td>
+<td>AIPA (full)</td>
+<td>391</td>
+<td>2</td>
+<td>0.068</td>
+<td>0.004</td>
+<td>0.031</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>LTP-only</td>
+<td>176</td>
+<td>2</td>
+<td>0.028</td>
+<td>0.017</td>
+<td>0.013</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>STI-only</td>
+<td>176</td>
+<td>2</td>
+<td>0.077</td>
+<td>0.003</td>
+<td>0.035</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>Naive fusion</td>
+<td>176</td>
+<td>2</td>
+<td>0.074</td>
+<td>0.006</td>
+<td>0.031</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>Adaptive fusion</td>
+<td>176</td>
+<td>2</td>
+<td>0.074</td>
+<td>0.000</td>
+<td>0.035</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>Sequential (GRU)</td>
+<td>176</td>
+<td>2</td>
+<td>0.028</td>
+<td>0.023</td>
+<td>0.011</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>Conversation-aware</td>
+<td>176</td>
+<td>2</td>
+<td>0.054</td>
+<td>0.009</td>
+<td>0.022</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>SASRec</td>
+<td>176</td>
+<td>2</td>
+<td>0.026</td>
+<td>0.014</td>
+<td>0.009</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>KBRD-style</td>
+<td>176</td>
+<td>2</td>
+<td>0.077</td>
+<td>0.003</td>
+<td>0.034</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA w/o relationship</td>
+<td>176</td>
+<td>2</td>
+<td>0.085</td>
+<td>0.000</td>
+<td>0.036</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA w/o counterfactual</td>
+<td>176</td>
+<td>2</td>
+<td>0.091</td>
+<td>0.000</td>
+<td>0.037</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA w/o clarification</td>
+<td>176</td>
+<td>2</td>
+<td>0.077</td>
+<td>0.026</td>
+<td>0.035</td>
+<td>0.012</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA w/o persistence</td>
+<td>176</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.028</td>
+<td>0.037</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA (rule policy)</td>
+<td>176</td>
+<td>2</td>
+<td>0.068</td>
+<td>0.000</td>
+<td>0.027</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Crime</td>
+<td>AIPA (full)</td>
+<td>176</td>
+<td>2</td>
+<td>0.080</td>
+<td>0.028</td>
+<td>0.037</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>LTP-only</td>
+<td>322</td>
+<td>2</td>
+<td>0.017</td>
+<td>0.005</td>
+<td>0.006</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>STI-only</td>
+<td>322</td>
+<td>2</td>
+<td>0.053</td>
+<td>0.006</td>
+<td>0.024</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>Naive fusion</td>
+<td>322</td>
+<td>2</td>
+<td>0.043</td>
+<td>0.000</td>
+<td>0.021</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>Adaptive fusion</td>
+<td>322</td>
+<td>2</td>
+<td>0.051</td>
+<td>0.011</td>
+<td>0.023</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>Sequential (GRU)</td>
+<td>322</td>
+<td>2</td>
+<td>0.014</td>
+<td>0.002</td>
+<td>0.005</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>Conversation-aware</td>
+<td>322</td>
+<td>2</td>
+<td>0.033</td>
+<td>0.005</td>
+<td>0.016</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>SASRec</td>
+<td>322</td>
+<td>2</td>
+<td>0.022</td>
+<td>0.006</td>
+<td>0.009</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>KBRD-style</td>
+<td>322</td>
+<td>2</td>
+<td>0.059</td>
+<td>0.006</td>
+<td>0.025</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA w/o relationship</td>
+<td>322</td>
+<td>2</td>
+<td>0.064</td>
+<td>0.005</td>
+<td>0.028</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA w/o counterfactual</td>
+<td>322</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.002</td>
+<td>0.026</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA w/o clarification</td>
+<td>322</td>
+<td>2</td>
+<td>0.047</td>
+<td>0.009</td>
+<td>0.025</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA w/o persistence</td>
+<td>322</td>
+<td>2</td>
+<td>0.048</td>
+<td>0.011</td>
+<td>0.026</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA (rule policy)</td>
+<td>322</td>
+<td>2</td>
+<td>0.047</td>
+<td>0.000</td>
+<td>0.025</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Drama</td>
+<td>AIPA (full)</td>
+<td>322</td>
+<td>2</td>
+<td>0.048</td>
+<td>0.011</td>
+<td>0.026</td>
+<td>0.007</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>LTP-only</td>
+<td>166</td>
+<td>2</td>
+<td>0.009</td>
+<td>0.003</td>
+<td>0.003</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>STI-only</td>
+<td>166</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.003</td>
+<td>0.029</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>Naive fusion</td>
+<td>166</td>
+<td>2</td>
+<td>0.045</td>
+<td>0.003</td>
+<td>0.020</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>Adaptive fusion</td>
+<td>166</td>
+<td>2</td>
+<td>0.042</td>
+<td>0.006</td>
+<td>0.017</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>Sequential (GRU)</td>
+<td>166</td>
+<td>2</td>
+<td>0.018</td>
+<td>0.000</td>
+<td>0.008</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>Conversation-aware</td>
+<td>166</td>
+<td>2</td>
+<td>0.036</td>
+<td>0.018</td>
+<td>0.018</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>SASRec</td>
+<td>166</td>
+<td>2</td>
+<td>0.018</td>
+<td>0.006</td>
+<td>0.011</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>KBRD-style</td>
+<td>166</td>
+<td>2</td>
+<td>0.066</td>
+<td>0.012</td>
+<td>0.031</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA w/o relationship</td>
+<td>166</td>
+<td>2</td>
+<td>0.075</td>
+<td>0.003</td>
+<td>0.029</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA w/o counterfactual</td>
+<td>166</td>
+<td>2</td>
+<td>0.066</td>
+<td>0.000</td>
+<td>0.026</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA w/o clarification</td>
+<td>166</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.003</td>
+<td>0.026</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA w/o persistence</td>
+<td>166</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.003</td>
+<td>0.026</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA (rule policy)</td>
+<td>166</td>
+<td>2</td>
+<td>0.045</td>
+<td>0.003</td>
+<td>0.019</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Romance</td>
+<td>AIPA (full)</td>
+<td>166</td>
+<td>2</td>
+<td>0.057</td>
+<td>0.003</td>
+<td>0.026</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>LTP-only</td>
+<td>178</td>
+<td>2</td>
+<td>0.112</td>
+<td>0.011</td>
+<td>0.079</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>STI-only</td>
+<td>178</td>
+<td>2</td>
+<td>0.169</td>
+<td>0.011</td>
+<td>0.099</td>
+<td>0.014</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>Naive fusion</td>
+<td>178</td>
+<td>2</td>
+<td>0.191</td>
+<td>0.022</td>
+<td>0.113</td>
+<td>0.016</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>Adaptive fusion</td>
+<td>178</td>
+<td>2</td>
+<td>0.183</td>
+<td>0.003</td>
+<td>0.118</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>Sequential (GRU)</td>
+<td>178</td>
+<td>2</td>
+<td>0.146</td>
+<td>0.011</td>
+<td>0.090</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>Conversation-aware</td>
+<td>178</td>
+<td>2</td>
+<td>0.166</td>
+<td>0.025</td>
+<td>0.096</td>
+<td>0.010</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>SASRec</td>
+<td>178</td>
+<td>2</td>
+<td>0.124</td>
+<td>0.011</td>
+<td>0.083</td>
+<td>0.017</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>KBRD-style</td>
+<td>178</td>
+<td>2</td>
+<td>0.199</td>
+<td>0.020</td>
+<td>0.112</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA w/o relationship</td>
+<td>178</td>
+<td>2</td>
+<td>0.177</td>
+<td>0.014</td>
+<td>0.111</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA w/o counterfactual</td>
+<td>178</td>
+<td>2</td>
+<td>0.180</td>
+<td>0.017</td>
+<td>0.112</td>
+<td>0.006</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA w/o clarification</td>
+<td>178</td>
+<td>2</td>
+<td>0.185</td>
+<td>0.017</td>
+<td>0.118</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA w/o persistence</td>
+<td>178</td>
+<td>2</td>
+<td>0.185</td>
+<td>0.011</td>
+<td>0.122</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA (rule policy)</td>
+<td>178</td>
+<td>2</td>
+<td>0.171</td>
+<td>0.014</td>
+<td>0.103</td>
+<td>0.009</td>
+</tr>
+<tr>
+<td>Sci-Fi</td>
+<td>AIPA (full)</td>
+<td>178</td>
+<td>2</td>
+<td>0.185</td>
+<td>0.011</td>
+<td>0.122</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>LTP-only</td>
+<td>250</td>
+<td>2</td>
+<td>0.022</td>
+<td>0.018</td>
+<td>0.009</td>
+<td>0.008</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>STI-only</td>
+<td>250</td>
+<td>2</td>
+<td>0.068</td>
+<td>0.012</td>
+<td>0.033</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>Naive fusion</td>
+<td>250</td>
+<td>2</td>
+<td>0.058</td>
+<td>0.010</td>
+<td>0.028</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>Adaptive fusion</td>
+<td>250</td>
+<td>2</td>
+<td>0.056</td>
+<td>0.000</td>
+<td>0.028</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>Sequential (GRU)</td>
+<td>250</td>
+<td>2</td>
+<td>0.042</td>
+<td>0.002</td>
+<td>0.014</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>Conversation-aware</td>
+<td>250</td>
+<td>2</td>
+<td>0.048</td>
+<td>0.008</td>
+<td>0.020</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>SASRec</td>
+<td>250</td>
+<td>2</td>
+<td>0.028</td>
+<td>0.012</td>
+<td>0.011</td>
+<td>0.005</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>KBRD-style</td>
+<td>250</td>
+<td>2</td>
+<td>0.074</td>
+<td>0.006</td>
+<td>0.035</td>
+<td>0.004</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA w/o relationship</td>
+<td>250</td>
+<td>2</td>
+<td>0.056</td>
+<td>0.000</td>
+<td>0.026</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA w/o counterfactual</td>
+<td>250</td>
+<td>2</td>
+<td>0.054</td>
+<td>0.002</td>
+<td>0.025</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA w/o clarification</td>
+<td>250</td>
+<td>2</td>
+<td>0.062</td>
+<td>0.002</td>
+<td>0.029</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA w/o persistence</td>
+<td>250</td>
+<td>2</td>
+<td>0.062</td>
+<td>0.002</td>
+<td>0.030</td>
+<td>0.002</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA (rule policy)</td>
+<td>250</td>
+<td>2</td>
+<td>0.058</td>
+<td>0.002</td>
+<td>0.027</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Thriller</td>
+<td>AIPA (full)</td>
+<td>250</td>
+<td>2</td>
+<td>0.062</td>
+<td>0.002</td>
+<td>0.030</td>
+<td>0.002</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="genre breakdown" src="../figures/fig09c_genre_breakdown.png" /></p>
 <h3>STI context length - AIPA (full), natural</h3>
 <table>
 <thead>
@@ -2392,48 +5660,48 @@
 <td>111</td>
 <td>0.144</td>
 <td>0.144</td>
-<td>0.079</td>
+<td>0.078</td>
 <td>0.059</td>
-<td>0.198</td>
-<td>0.198</td>
-<td>0.093</td>
-<td>0.063</td>
+<td>0.185</td>
+<td>0.185</td>
+<td>0.089</td>
+<td>0.061</td>
 </tr>
 <tr>
 <td>2-3</td>
 <td>356</td>
-<td>0.081</td>
-<td>0.081</td>
+<td>0.087</td>
+<td>0.087</td>
 <td>0.046</td>
-<td>0.035</td>
-<td>0.136</td>
-<td>0.136</td>
-<td>0.060</td>
-<td>0.039</td>
+<td>0.033</td>
+<td>0.135</td>
+<td>0.135</td>
+<td>0.058</td>
+<td>0.036</td>
 </tr>
 <tr>
 <td>4-6</td>
 <td>424</td>
-<td>0.088</td>
-<td>0.088</td>
-<td>0.055</td>
-<td>0.045</td>
-<td>0.138</td>
-<td>0.138</td>
+<td>0.096</td>
+<td>0.096</td>
+<td>0.058</td>
+<td>0.047</td>
+<td>0.134</td>
+<td>0.134</td>
 <td>0.068</td>
-<td>0.049</td>
+<td>0.050</td>
 </tr>
 <tr>
 <td>&gt;6</td>
 <td>186</td>
-<td>0.070</td>
-<td>0.070</td>
+<td>0.067</td>
+<td>0.067</td>
 <td>0.036</td>
-<td>0.025</td>
-<td>0.124</td>
-<td>0.124</td>
+<td>0.027</td>
+<td>0.116</td>
+<td>0.116</td>
 <td>0.049</td>
-<td>0.028</td>
+<td>0.030</td>
 </tr>
 </tbody>
 </table>
@@ -2450,73 +5718,85 @@
 <tbody>
 <tr>
 <td>AIPA (full)</td>
-<td>0.315</td>
-<td>0.190</td>
+<td>0.241</td>
+<td>0.238</td>
 <td>0.167</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>0.259</td>
-<td>0.143</td>
-<td>0.150</td>
+<td>0.190</td>
+<td>0.183</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
-<td>0.204</td>
-<td>0.214</td>
-<td>0.233</td>
+<td>0.241</td>
+<td>0.190</td>
+<td>0.183</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
-<td>0.222</td>
-<td>0.214</td>
+<td>0.185</td>
+<td>0.238</td>
 <td>0.250</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
-<td>0.315</td>
-<td>0.190</td>
+<td>0.241</td>
+<td>0.238</td>
 <td>0.167</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
-<td>0.241</td>
+<td>0.185</td>
+<td>0.214</td>
+<td>0.250</td>
+</tr>
+<tr>
+<td>Adaptive fusion</td>
+<td>0.278</td>
+<td>0.214</td>
+<td>0.250</td>
+</tr>
+<tr>
+<td>Conversation-aware</td>
+<td>0.148</td>
+<td>0.119</td>
+<td>0.067</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>0.426</td>
 <td>0.167</td>
 <td>0.183</td>
 </tr>
 <tr>
-<td>Adaptive fusion</td>
-<td>0.241</td>
-<td>0.167</td>
-<td>0.200</td>
-</tr>
-<tr>
-<td>Conversation-aware</td>
-<td>0.056</td>
-<td>0.048</td>
-<td>0.017</td>
-</tr>
-<tr>
 <td>LTP-only</td>
-<td>0.019</td>
+<td>0.000</td>
 <td>0.048</td>
 <td>0.050</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
-<td>0.204</td>
-<td>0.167</td>
-<td>0.183</td>
+<td>0.296</td>
+<td>0.214</td>
+<td>0.233</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>0.056</td>
+<td>0.000</td>
+<td>0.083</td>
 </tr>
 <tr>
 <td>STI-only</td>
 <td>0.296</td>
-<td>0.190</td>
-<td>0.183</td>
+<td>0.214</td>
+<td>0.200</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
-<td>0.019</td>
+<td>0.000</td>
 <td>0.024</td>
 <td>0.050</td>
 </tr>
@@ -2542,63 +5822,63 @@
 <tbody>
 <tr>
 <td>0.000</td>
-<td>0.081</td>
-<td>0.081</td>
-<td>0.045</td>
-<td>0.034</td>
-<td>0.125</td>
-<td>0.125</td>
-<td>0.056</td>
-<td>0.037</td>
-<td>0.120</td>
+<td>0.087</td>
+<td>0.087</td>
+<td>0.048</td>
+<td>0.036</td>
+<td>0.129</td>
+<td>0.129</td>
+<td>0.058</td>
+<td>0.039</td>
+<td>0.124</td>
 </tr>
 <tr>
 <td>0.250</td>
 <td>0.088</td>
 <td>0.088</td>
-<td>0.047</td>
-<td>0.035</td>
-<td>0.133</td>
-<td>0.133</td>
-<td>0.058</td>
-<td>0.038</td>
-<td>0.132</td>
+<td>0.049</td>
+<td>0.037</td>
+<td>0.137</td>
+<td>0.137</td>
+<td>0.061</td>
+<td>0.040</td>
+<td>0.156</td>
 </tr>
 <tr>
 <td>0.500</td>
-<td>0.087</td>
-<td>0.087</td>
-<td>0.048</td>
-<td>0.036</td>
+<td>0.092</td>
+<td>0.092</td>
+<td>0.050</td>
+<td>0.037</td>
 <td>0.132</td>
 <td>0.132</td>
-<td>0.059</td>
-<td>0.039</td>
-<td>0.132</td>
+<td>0.060</td>
+<td>0.040</td>
+<td>0.172</td>
 </tr>
 <tr>
 <td>0.750</td>
 <td>0.077</td>
 <td>0.077</td>
-<td>0.041</td>
-<td>0.030</td>
-<td>0.112</td>
-<td>0.112</td>
-<td>0.050</td>
-<td>0.032</td>
-<td>0.112</td>
+<td>0.042</td>
+<td>0.031</td>
+<td>0.114</td>
+<td>0.114</td>
+<td>0.051</td>
+<td>0.034</td>
+<td>0.132</td>
 </tr>
 <tr>
 <td>1.000</td>
-<td>0.022</td>
-<td>0.022</td>
-<td>0.012</td>
-<td>0.008</td>
-<td>0.049</td>
-<td>0.049</td>
-<td>0.018</td>
+<td>0.029</td>
+<td>0.029</td>
+<td>0.013</td>
+<td>0.009</td>
+<td>0.044</td>
+<td>0.044</td>
+<td>0.017</td>
 <td>0.010</td>
-<td>0.012</td>
+<td>0.008</td>
 </tr>
 </tbody>
 </table>
@@ -2618,72 +5898,72 @@
 <tr>
 <td>LTP-only</td>
 <td>1077</td>
-<td>0.052 ± 0.002 [0.044, 0.062]</td>
-<td>0.029 ± 0.001 [0.025, 0.036]</td>
-<td>0.023 ± 0.001 [0.018, 0.028]</td>
+<td>0.053 ± 0.002 [0.045, 0.063]</td>
+<td>0.030 ± 0.001 [0.025, 0.037]</td>
+<td>0.023 ± 0.000 [0.018, 0.029]</td>
 </tr>
 <tr>
 <td>STI-only</td>
 <td>1077</td>
-<td>0.101 ± 0.003 [0.089, 0.113]</td>
-<td>0.053 ± 0.004 [0.046, 0.061]</td>
-<td>0.039 ± 0.004 [0.033, 0.046]</td>
+<td>0.097 ± 0.003 [0.084, 0.109]</td>
+<td>0.052 ± 0.001 [0.046, 0.060]</td>
+<td>0.039 ± 0.002 [0.033, 0.045]</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
 <td>1077</td>
-<td>0.087 ± 0.007 [0.078, 0.099]</td>
-<td>0.048 ± 0.005 [0.042, 0.056]</td>
-<td>0.036 ± 0.004 [0.030, 0.042]</td>
+<td>0.092 ± 0.005 [0.078, 0.104]</td>
+<td>0.050 ± 0.003 [0.043, 0.057]</td>
+<td>0.037 ± 0.003 [0.031, 0.043]</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
 <td>1077</td>
-<td>0.091 ± 0.001 [0.081, 0.104]</td>
-<td>0.051 ± 0.000 [0.045, 0.058]</td>
-<td>0.039 ± 0.001 [0.033, 0.045]</td>
+<td>0.094 ± 0.002 [0.082, 0.106]</td>
+<td>0.053 ± 0.001 [0.046, 0.061]</td>
+<td>0.041 ± 0.000 [0.034, 0.048]</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>1077</td>
-<td>0.100 ± 0.001 [0.089, 0.115]</td>
-<td>0.056 ± 0.000 [0.048, 0.065]</td>
-<td>0.043 ± 0.000 [0.036, 0.051]</td>
+<td>0.104 ± 0.002 [0.093, 0.117]</td>
+<td>0.054 ± 0.002 [0.047, 0.062]</td>
+<td>0.039 ± 0.002 [0.033, 0.045]</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>1077</td>
-<td>0.094 ± 0.005 [0.084, 0.105]</td>
-<td>0.052 ± 0.004 [0.045, 0.060]</td>
-<td>0.039 ± 0.003 [0.033, 0.045]</td>
+<td>0.103 ± 0.002 [0.091, 0.116]</td>
+<td>0.053 ± 0.002 [0.046, 0.061]</td>
+<td>0.039 ± 0.002 [0.033, 0.044]</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>1077</td>
-<td>0.089 ± 0.003 [0.078, 0.101]</td>
-<td>0.049 ± 0.003 [0.042, 0.056]</td>
-<td>0.037 ± 0.003 [0.031, 0.044]</td>
+<td>0.090 ± 0.001 [0.079, 0.104]</td>
+<td>0.051 ± 0.000 [0.043, 0.059]</td>
+<td>0.039 ± 0.000 [0.033, 0.046]</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
 <td>1077</td>
-<td>0.089 ± 0.000 [0.078, 0.101]</td>
-<td>0.051 ± 0.000 [0.044, 0.059]</td>
-<td>0.040 ± 0.001 [0.034, 0.048]</td>
+<td>0.093 ± 0.000 [0.082, 0.107]</td>
+<td>0.052 ± 0.000 [0.045, 0.060]</td>
+<td>0.040 ± 0.001 [0.034, 0.047]</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>1077</td>
-<td>0.085 ± 0.005 [0.074, 0.097]</td>
-<td>0.046 ± 0.003 [0.040, 0.054]</td>
-<td>0.035 ± 0.002 [0.029, 0.041]</td>
+<td>0.088 ± 0.005 [0.077, 0.100]</td>
+<td>0.051 ± 0.002 [0.044, 0.058]</td>
+<td>0.039 ± 0.002 [0.033, 0.047]</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>1077</td>
-<td>0.089 ± 0.000 [0.078, 0.101]</td>
-<td>0.051 ± 0.001 [0.044, 0.059]</td>
-<td>0.040 ± 0.001 [0.034, 0.048]</td>
+<td>0.093 ± 0.000 [0.082, 0.107]</td>
+<td>0.053 ± 0.000 [0.045, 0.060]</td>
+<td>0.040 ± 0.001 [0.034, 0.047]</td>
 </tr>
 </tbody>
 </table>
@@ -2707,13 +5987,13 @@
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>-0.0051</td>
+<td>-0.0097</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0000</td>
+<td>0.0028</td>
 <td>1.0000</td>
 </tr>
 <tr>
@@ -2725,7 +6005,7 @@
 <tr>
 <td>AIPA (rule policy)</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0037</td>
+<td>0.0046</td>
 <td>1.0000</td>
 </tr>
 </tbody>
@@ -2749,7 +6029,7 @@
 <td>LTP-only</td>
 <td>515597</td>
 <td>2.062</td>
-<td>2.450</td>
+<td>2.270</td>
 <td>5.500</td>
 <td>0.018</td>
 <td>0.015</td>
@@ -2759,110 +6039,130 @@
 <td>STI-only</td>
 <td>515597</td>
 <td>2.062</td>
-<td>3.110</td>
-<td>7.000</td>
-<td>0.032</td>
-<td>0.026</td>
+<td>2.525</td>
+<td>6.000</td>
+<td>0.018</td>
+<td>0.014</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>Naive fusion</td>
 <td>515597</td>
 <td>2.062</td>
-<td>2.510</td>
-<td>5.500</td>
-<td>0.020</td>
-<td>0.016</td>
+<td>2.505</td>
+<td>6.000</td>
+<td>0.017</td>
+<td>0.014</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>Adaptive fusion</td>
 <td>526862</td>
 <td>2.107</td>
-<td>2.800</td>
+<td>2.630</td>
 <td>5.500</td>
-<td>0.027</td>
 <td>0.022</td>
+<td>0.018</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>Sequential (GRU)</td>
 <td>492877</td>
 <td>1.972</td>
-<td>7.970</td>
-<td>6.500</td>
-<td>0.041</td>
-<td>0.034</td>
+<td>6.465</td>
+<td>6.000</td>
+<td>0.028</td>
+<td>0.023</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>Conversation-aware</td>
 <td>476173</td>
 <td>1.905</td>
-<td>1.560</td>
-<td>7.000</td>
-<td>0.019</td>
-<td>0.016</td>
+<td>1.125</td>
+<td>5.500</td>
+<td>0.011</td>
+<td>0.009</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>SASRec</td>
+<td>526413</td>
+<td>2.106</td>
+<td>28.860</td>
+<td>8.000</td>
+<td>0.040</td>
+<td>0.033</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td>KBRD-style</td>
+<td>477814</td>
+<td>1.911</td>
+<td>1.700</td>
+<td>6.500</td>
+<td>0.010</td>
+<td>0.009</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA w/o relationship</td>
 <td>547222</td>
 <td>2.189</td>
-<td>5.090</td>
-<td>5.500</td>
-<td>0.045</td>
-<td>0.038</td>
+<td>5.425</td>
+<td>6.500</td>
+<td>0.034</td>
+<td>0.028</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA w/o counterfactual</td>
 <td>547222</td>
 <td>2.189</td>
-<td>5.260</td>
+<td>5.730</td>
 <td>6.500</td>
-<td>0.043</td>
-<td>0.036</td>
+<td>0.046</td>
+<td>0.039</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA w/o clarification</td>
 <td>547542</td>
 <td>2.190</td>
-<td>5.650</td>
-<td>7.000</td>
-<td>0.049</td>
-<td>0.041</td>
+<td>6.080</td>
+<td>6.000</td>
+<td>0.040</td>
+<td>0.034</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA w/o persistence</td>
 <td>547542</td>
 <td>2.190</td>
-<td>4.025</td>
-<td>5.500</td>
-<td>0.047</td>
-<td>0.039</td>
+<td>4.165</td>
+<td>6.000</td>
+<td>0.031</td>
+<td>0.026</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA (rule policy)</td>
 <td>535378</td>
 <td>2.142</td>
-<td>5.460</td>
+<td>5.020</td>
 <td>7.000</td>
-<td>0.055</td>
-<td>0.046</td>
+<td>0.044</td>
+<td>0.037</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>AIPA (full)</td>
 <td>547542</td>
 <td>2.190</td>
-<td>4.020</td>
-<td>5.500</td>
-<td>0.052</td>
-<td>0.044</td>
+<td>3.985</td>
+<td>6.000</td>
+<td>0.032</td>
+<td>0.026</td>
 <td>n/a</td>
 </tr>
 </tbody>
@@ -2888,88 +6188,88 @@
 <td>natural</td>
 <td>Complement</td>
 <td>165</td>
-<td>0.912</td>
-<td>0.770</td>
-<td>0.000</td>
-<td>1293.130</td>
-<td>544.500</td>
+<td>0.909</td>
+<td>0.694</td>
+<td>0.006</td>
+<td>1216.655</td>
+<td>456.000</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>natural</td>
 <td>Conflict</td>
 <td>48</td>
-<td>0.948</td>
-<td>0.729</td>
+<td>0.927</td>
+<td>0.677</td>
 <td>0.000</td>
-<td>1147.490</td>
-<td>376.000</td>
+<td>1153.062</td>
+<td>356.500</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>natural</td>
 <td>Consistent</td>
 <td>514</td>
-<td>0.903</td>
-<td>0.179</td>
-<td>0.007</td>
-<td>1098.008</td>
-<td>317.500</td>
+<td>0.900</td>
+<td>0.169</td>
+<td>0.002</td>
+<td>1086.559</td>
+<td>341.500</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>natural</td>
 <td>Override</td>
 <td>14</td>
-<td>0.929</td>
-<td>0.429</td>
+<td>0.857</td>
+<td>0.500</td>
 <td>0.000</td>
-<td>1124.821</td>
-<td>143.000</td>
+<td>1064.071</td>
+<td>138.000</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>natural</td>
 <td>Uncertain</td>
 <td>336</td>
-<td>0.918</td>
-<td>0.098</td>
+<td>0.917</td>
+<td>0.101</td>
 <td>0.640</td>
-<td>1343.643</td>
-<td>422.000</td>
+<td>1358.417</td>
+<td>440.000</td>
 <td>0.327</td>
 </tr>
 <tr>
 <td>synthetic</td>
 <td>Conflict</td>
 <td>39</td>
-<td>0.808</td>
-<td>0.090</td>
+<td>0.821</td>
+<td>0.064</td>
 <td>0.000</td>
-<td>583.090</td>
-<td>53.500</td>
+<td>523.590</td>
+<td>47.000</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>synthetic</td>
 <td>Consistent</td>
 <td>47</td>
-<td>0.979</td>
+<td>0.957</td>
 <td>0.000</td>
 <td>0.000</td>
-<td>1208.394</td>
-<td>596.500</td>
+<td>1178.160</td>
+<td>620.000</td>
 <td>0.000</td>
 </tr>
 <tr>
 <td>synthetic</td>
 <td>Override</td>
 <td>39</td>
-<td>0.744</td>
+<td>0.756</td>
+<td>0.026</td>
 <td>0.000</td>
-<td>0.000</td>
-<td>291.244</td>
-<td>26.500</td>
+<td>230.987</td>
+<td>21.500</td>
 <td>0.000</td>
 </tr>
 </tbody>
@@ -2980,111 +6280,110 @@
 <li>Dialogue excerpt: Recommender: Yes great decade for actions! | Seeker: Oh course! :) | Seeker: I really liked True Lies (1994) and Speed  (1994) | Seeker: What do you think?</li>
 <li>LTP profile (history=50): Drama 0.24; Comedy 0.17; Romance 0.16</li>
 <li>STI signal: Action 0.63; Romance 0.13; Thriller 0.13</li>
-<li>Reference relationship: Complement (weak_rule); predicted: Consistent (conf 0.65)</li>
+<li>Reference relationship: Complement (weak_rule); predicted: Consistent (conf 0.642)</li>
 <li>Arbitration: <strong>Fuse</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: STI-driven</li>
-<li>Target: Die Hard 2 (1990) (rank 297, hit@10=False); top-5: Black Panther (2018); John Wick (2014); The Matrix (1999); Deadpool  (2016); Baby Driver  (2017)</li>
+<li>Target: Die Hard 2 (1990) (rank 271, hit@10=False); top-5: Black Panther (2018); John Wick (2014); Deadpool  (2016); Die Hard (1988); The Matrix (1999)</li>
 </ul>
 <p><strong>Case 2</strong> - <code>21394/3/140335</code> (natural; seeker 1034)</p>
 <ul>
 <li>Dialogue excerpt: Recommender: Hi | Recommender: What kind of movies do you like? | Seeker: Hiya. I like rom-com movies. Can you recommend any?</li>
 <li>LTP profile (history=50): Drama 0.24; Thriller 0.16; Mystery 0.11</li>
 <li>STI signal: Comedy 0.50; Romance 0.50</li>
-<li>Reference relationship: Consistent (weak_rule); predicted: Conflict (conf 0.493)</li>
-<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.33, w_STI=0.67); counterfactual driver: Jointly-driven</li>
-<li>Target: Knocked Up (2007) (rank 32, hit@10=False); top-5: Love Actually (2003); Notting Hill; Forrest Gump (1994); Jumanji  (2017); Dear John  (2010)</li>
+<li>Reference relationship: Consistent (weak_rule); predicted: Conflict (conf 0.446)</li>
+<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.34, w_STI=0.66); counterfactual driver: Jointly-driven</li>
+<li>Target: Knocked Up (2007) (rank 12, hit@10=False); top-5: Love Actually (2003); Notting Hill; The Shape of Water  (2017); Forrest Gump (1994); Dear John  (2010)</li>
 </ul>
 <p><strong>Case 3</strong> - <code>20721/8/93013</code> (natural; seeker 1009)</p>
 <ul>
 <li>Dialogue excerpt: Seeker: Yes, I loved it | Seeker: I love movies with Will Ferrell too, like Anchorman | Recommender: What about Jumanji  (2017) | Seeker: Oh, I haven't seen Jumanji  (2017) but I did see the older Jumanji (1995) and loved it.</li>
 <li>LTP profile (history=4): Crime 0.38; Drama 0.38; Film-Noir 0.09</li>
 <li>STI signal: Comedy 0.58; Adventure 0.08; Children 0.08</li>
-<li>Reference relationship: Conflict (weak_rule); predicted: Consistent (conf 0.646)</li>
-<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.45, w_STI=0.55); counterfactual driver: Jointly-driven</li>
-<li>Target: Daddy's Home  (2015) (rank 176, hit@10=False); top-5: Jumanji  (2017); Black Panther (2018); Blended  (2014); Bridesmaids  (2011); Ferdinand (2017)</li>
+<li>Reference relationship: Conflict (weak_rule); predicted: Consistent (conf 0.53)</li>
+<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.43, w_STI=0.57); counterfactual driver: Jointly-driven</li>
+<li>Target: Daddy's Home  (2015) (rank 139, hit@10=False); top-5: Jumanji  (2017); Black Panther (2018); Wonder Woman  (2017); Mad Max: Fury Road (2015); Bridesmaids  (2011)</li>
 </ul>
 <p><strong>Case 4</strong> - <code>22721/3/98740</code> (natural; seeker 1087)</p>
 <ul>
 <li>Dialogue excerpt: Recommender: hi there! I would like to reccomend some movies to ya. What kind of movies do you like? | Seeker: I;d like to see some war movies this weekend similar to Dunkirk  (2017) , Darkest Hour  (2017) , Atonement  (2007) | Recommender: Oh okay!</li>
 <li>LTP profile (history=50): Comedy 0.26; Drama 0.22; Romance 0.13</li>
 <li>STI signal: War 0.68; Drama 0.18; Romance 0.06</li>
-<li>Reference relationship: Override (weak_rule); predicted: Override (conf 0.538)</li>
+<li>Reference relationship: Override (weak_rule); predicted: Override (conf 0.612)</li>
 <li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.19, w_STI=0.81); counterfactual driver: STI-driven</li>
-<li>Target: Enemy at the Gates (2001) (rank 2157, hit@10=False); top-5: Dunkirk  (2017); Saving Private Ryan (1998); Black Panther (2018); Schindler's List (1993); It  (2017)</li>
+<li>Target: Enemy at the Gates (2001) (rank 1471, hit@10=False); top-5: Dunkirk  (2017); Saving Private Ryan (1998); Schindler's List (1993); Hacksaw Ridge; Black Hawk Down  (2002)</li>
 </ul>
 <p><strong>Case 5</strong> - <code>22009/2/98259</code> (natural; seeker 1035)</p>
 <ul>
 <li>Dialogue excerpt: Recommender: Hello! How are you | Seeker: I'm good!  My brother is coming to visit and I want to queue up some good old fashioned monster movies for him.  Any suggestions?</li>
 <li>LTP profile (history=9): Comedy 0.28; Horror 0.18; Sci-Fi 0.17</li>
 <li>STI signal: (no genre cue)</li>
-<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.936)</li>
+<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.933)</li>
 <li>Arbitration: <strong>Ask_Clarification</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: STI-driven</li>
 <li>Clarification: <em>You usually go for comedy movies. Would you like something similar, or are you in the mood for a change?</em></li>
-<li>Target: Monster  (2003) (rank 6182, hit@10=False); top-5: Black Panther (2018); Wonder Woman  (2017); Jumanji  (2017); The Shape of Water  (2017); Arrival  (2016)</li>
+<li>Target: Monster  (2003) (rank 6141, hit@10=False); top-5: Black Panther (2018); Wonder Woman  (2017); Jumanji  (2017); The Shape of Water  (2017); Arrival  (2016)</li>
 </ul>
-<p><strong>Case 6</strong> - <code>21866/9/111918</code> (natural; seeker 1053)</p>
+<p><strong>Case 6</strong> - <code>21861/11/204870</code> (natural; seeker 1039)</p>
 <ul>
-<li>Dialogue excerpt: Seeker: I love Blades of Glory (2007) | Recommender: Well, other good movies like that include Talladega Nights: The Ballad of Ricky Bobby (2006) | Seeker: Love Will Ferrell movies | Seeker: So I've seen Ricky Bobby</li>
-<li>LTP profile (history=50): Action 0.31; Crime 0.19; Comedy 0.15</li>
-<li>STI signal: Comedy 0.75; Romance 0.25</li>
-<li>Reference relationship: Complement (weak_rule); predicted: Consistent (conf 0.771)</li>
-<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.46, w_STI=0.54); counterfactual driver: STI-driven</li>
-<li>Target: Step Brothers  (2008) (rank 824, hit@10=False); top-5: Love Actually (2003); 50 First Dates (2004); Bad Moms (2016); Trainwreck  (2015); Sixteen Candles (1984)</li>
+<li>Dialogue excerpt: Recommender: or maybe District 9 (2009) | Seeker: I haven’t seen either of those, but I will check them out. Thanks | Recommender: my pleasure | Recommender: thanks for visiting</li>
+<li>LTP profile (history=32): Sci-Fi 0.21; Action 0.15; Drama 0.15</li>
+<li>STI signal: Sci-Fi 1.00</li>
+<li>Reference relationship: Consistent (weak_rule); predicted: Consistent (conf 0.645)</li>
+<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.49, w_STI=0.51); counterfactual driver: STI-driven</li>
+<li>Target: Deadpool 2  (2018) (rank 180, hit@10=False); top-5: Jumanji  (2017); Thor: Ragnarok (2017); Black Panther (2018); Star Wars: Episode VIII – The Last Jedi (2017); Rogue One: A Star Wars Story (2016)</li>
 </ul>
-<p><strong>Case 7</strong> - <code>20191/10/78186</code> (natural; seeker 971)</p>
+<p><strong>Case 7</strong> - <code>20191/13/108426</code> (natural; seeker 971)</p>
 <ul>
-<li>Dialogue excerpt: Seeker: American | Recommender: i could recommend you too American Pie 2 (2001) | Recommender: There are many of those movies | Seeker: Im not sure if i saw american pie 2.</li>
+<li>Dialogue excerpt: Seeker: Im not sure if i saw american pie 2. | Recommender: Have you ever seen Scary Movie (2000) ? | Recommender: Well, you should try them | Seeker: scary movie was good.  The first one atleast</li>
 <li>LTP profile (history=0): (none: cold seeker)</li>
-<li>STI signal: Comedy 1.00</li>
-<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.996)</li>
-<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.19, w_STI=0.81); counterfactual driver: STI-driven</li>
-<li>Target: Scary Movie (2000) (rank 726, hit@10=False); top-5: The Hangover (2009); Jumanji  (2017); The Boss Baby (2017); 50 First Dates (2004); Bad Moms (2016)</li>
-</ul>
-<p><strong>Case 8</strong> - <code>23322/9/204870</code> (natural; seeker 1084)</p>
-<ul>
-<li>Dialogue excerpt: Recommender: fine | Recommender: Avengers: Infinity War (2018) | Recommender: is good movie | Seeker: I saw it, it's very good</li>
-<li>LTP profile (history=18): Action 0.20; Thriller 0.15; Adventure 0.14</li>
-<li>STI signal: (no genre cue)</li>
-<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.959)</li>
-<li>Arbitration: <strong>Ask_Clarification</strong> (w_LTP=0.47, w_STI=0.53); counterfactual driver: STI-driven</li>
-<li>Clarification: <em>You usually go for action movies. Would you like something similar, or are you in the mood for a change?</em></li>
-<li>Target: Deadpool 2  (2018) (rank 58, hit@10=False); top-5: Black Panther (2018); Wonder Woman  (2017); Jumanji  (2017); The Shape of Water  (2017); Thor: Ragnarok (2017)</li>
-</ul>
-<p><strong>Case 9</strong> - <code>syn/con2/21780/13/178715</code> (synthetic; seeker 1034)</p>
-<ul>
-<li>Dialogue excerpt: Seeker: That one as well! | Seeker: I saw Lost in Translation  (2003). Great movie! | Recommender: Okay great I haven't seen that one | Seeker: Can you recommend something with singing?</li>
-<li>LTP profile (history=50): Action 0.16; Comedy 0.13; Sci-Fi 0.13</li>
-<li>STI signal: Musical 1.00</li>
-<li>Reference relationship: Conflict (synthetic_controlled); predicted: Conflict (conf 0.852)</li>
-<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.24, w_STI=0.76); counterfactual driver: STI-driven</li>
-<li>Target: Dirty Dancing (rank 602, hit@10=False); top-5: Love Actually (2003); Mary Poppins  (1964); Crazy, Stupid, Love (2011); Dear John  (2010); Forrest Gump (1994)</li>
-</ul>
-<p><strong>Case 10</strong> - <code>syn/ove3/20454/10/152496</code> (synthetic; seeker 967)</p>
-<ul>
-<li>Dialogue excerpt: Seeker: Do you think the Reese Witherspoon one called Fear  (1990) ? | Seeker: haha thats great you brought those up! | Seeker: Thank you very much for the recommendations. I might make him watch Clueless  (1995)  too haha | Seeker: Tonight I only want a love story, no horror this time.</li>
-<li>LTP profile (history=4): Horror 0.36; Comedy 0.23; Thriller 0.21</li>
-<li>STI signal: Romance 0.92; Action 0.04; Horror 0.04</li>
-<li>Reference relationship: Override (synthetic_controlled); predicted: Override (conf 0.698)</li>
-<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.16, w_STI=0.84); counterfactual driver: Jointly-driven</li>
-<li>Target: 50 First Dates (2004) (rank 36, hit@10=False); top-5: Forrest Gump (1994); Frozen (2013); Tangled (2010); The Lion King (1994); Dear John  (2010)</li>
-</ul>
-<p><strong>Case 11</strong> - <code>23190/6/125431</code> (natural; seeker 1099)</p>
-<ul>
-<li>Dialogue excerpt: Seeker: I don't mind what genre you recommend. But I do like comedies and horror. | Seeker: Nothing too raunchy or little substance though. | Recommender: Do you like Stephen King movies? What about Pet Sematary  (1989) or Carrie  (1976) ? | Recommender: those are two of my favorites</li>
-<li>LTP profile (history=28): Comedy 0.28; Thriller 0.17; Drama 0.11</li>
 <li>STI signal: Comedy 0.50; Horror 0.50</li>
-<li>Reference relationship: Consistent (weak_rule); predicted: Consistent (conf 0.712)</li>
-<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.41, w_STI=0.59); counterfactual driver: Jointly-driven</li>
-<li>Target: Annabelle  (2014) (rank 3, hit@10=True); top-5: It  (2017); Get Out (2017); Annabelle  (2014); Happy Death Day  (2017); The Shining  (1980)</li>
+<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.999)</li>
+<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.2, w_STI=0.8); counterfactual driver: STI-driven</li>
+<li>Target: You Don't Mess with the Zohan (2008) (rank 250, hit@10=False); top-5: Get Out (2017); It  (2017); The Sixth Sense (1999); The Shining  (1980); Happy Death Day  (2017)</li>
 </ul>
-<p><strong>Case 12</strong> - <code>22087/7/139492</code> (natural; seeker 959)</p>
+<p><strong>Case 8</strong> - <code>20847/6/78418</code> (natural; seeker 1001)</p>
 <ul>
-<li>Dialogue excerpt: Seeker: I'm great. Thanks. | Seeker: I'm looking for suggestions for a movie night with friends, any chance you can help me out? | Recommender: I think I can!  Maybe a musical like Grease  (1978) for everyone to sing along? | Seeker: Oh that sounds like fun.</li>
-<li>LTP profile (history=50): Comedy 0.20; Animation 0.15; Children 0.13</li>
+<li>Dialogue excerpt: Recommender: Do you like Up  (2009) ? | Recommender: It is really sweet to watch with kids as well | Recommender: Also I recommend Jumanji  (2017) for adventure | Recommender: That is safe for kids too</li>
+<li>LTP profile (history=7): Comedy 0.25; Action 0.21; Sci-Fi 0.17</li>
 <li>STI signal: (no genre cue)</li>
-<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.805)</li>
-<li>Arbitration: <strong>Ask_Clarification</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: STI-driven</li>
+<li>Reference relationship: Uncertain (weak_rule); predicted: Uncertain (conf 0.87)</li>
+<li>Arbitration: <strong>Ask_Clarification</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: Jointly-driven</li>
 <li>Clarification: <em>You usually go for comedy movies. Would you like something similar, or are you in the mood for a change?</em></li>
-<li>Target: The Rock  (1996) (rank 1486, hit@10=False); top-5: Black Panther (2018); Jumanji  (2017); It  (2017); Wonder Woman  (2017); Dunkirk  (2017)</li>
+<li>Target: The Avengers  (2012) (rank 172, hit@10=False); top-5: Black Panther (2018); Wonder Woman  (2017); Deadpool  (2016); Jumanji  (2017); Mad Max: Fury Road (2015)</li>
+</ul>
+<p><strong>Case 9</strong> - <code>syn/con3/21530/6/101794</code> (synthetic; seeker 1024)</p>
+<ul>
+<li>Dialogue excerpt: Seeker: My boyfriend likes action movies | Seeker: can you recommend any? | Recommender: Yes i have a few to recommend | Seeker: Please only something funny, I am not into drama anymore.</li>
+<li>LTP profile (history=50): Drama 0.21; Horror 0.18; Thriller 0.13</li>
+<li>STI signal: Comedy 0.92; Action 0.04; Drama 0.04</li>
+<li>Reference relationship: Conflict (synthetic_controlled); predicted: Conflict (conf 0.719)</li>
+<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.25, w_STI=0.75); counterfactual driver: Jointly-driven</li>
+<li>Target: The Mask  (1994) (rank 152, hit@10=False); top-5: Jumanji  (2017); The Boss Baby (2017); Wonder Woman  (2017); Wonder  (2017); Dumb and Dumber (1994)</li>
+</ul>
+<p><strong>Case 10</strong> - <code>syn/ove2/22190/5/205435</code> (synthetic; seeker 972)</p>
+<ul>
+<li>Dialogue excerpt: Seeker: I need a good comedy | Seeker: my friends are coming for the night | Seeker: Do you know some good ones? | Seeker: Tonight I am in the mood for a musical.</li>
+<li>LTP profile (history=50): Horror 0.23; Drama 0.21; Comedy 0.15</li>
+<li>STI signal: Musical 0.94; Comedy 0.06</li>
+<li>Reference relationship: Override (synthetic_controlled); predicted: Override (conf 0.908)</li>
+<li>Arbitration: <strong>Prioritize_STI</strong> (w_LTP=0.18, w_STI=0.82); counterfactual driver: STI-driven</li>
+<li>Target: Grease 2 (1982) (rank 137, hit@10=False); top-5: Frozen (2013); The Lion King (1994); The Boss Baby (2017); Cars  (2006); Peter Rabbit (2018)</li>
+</ul>
+<p><strong>Case 11</strong> - <code>22370/11/184418</code> (natural; seeker 1074)</p>
+<ul>
+<li>Dialogue excerpt: Seeker: an you | Seeker: and you sorry | Recommender: I could suggest Sweeney Todd: The Demon Barber of Fleet Street  (2007) with Johnny Depp.  It's a  musical, but it has lots of gore. | Seeker: movies how It  (2017)</li>
+<li>LTP profile (history=17): Horror 0.49; Thriller 0.18; Comedy 0.09</li>
+<li>STI signal: Horror 1.00</li>
+<li>Reference relationship: Consistent (weak_rule); predicted: Consistent (conf 0.969)</li>
+<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: STI-driven</li>
+<li>Target: Get Out (2017) (rank 6, hit@10=True); top-5: Annabelle  (2014); It  (2017); Pet Sematary  (1989); The Conjuring (2013); Insidious  (2011)</li>
+</ul>
+<p><strong>Case 12</strong> - <code>22095/7/90253</code> (natural; seeker 959)</p>
+<ul>
+<li>Dialogue excerpt: Recommender: Awesome!  What are you in the mood for? | Seeker: How about comedies. | Recommender: I love a good comedy.  How about I Feel Pretty (2018) ? | Seeker: I have never seen this one.  I haven't seen anything real new in a long time.</li>
+<li>LTP profile (history=50): Horror 0.20; Thriller 0.13; Comedy 0.13</li>
+<li>STI signal: Comedy 1.00</li>
+<li>Reference relationship: Consistent (weak_rule); predicted: Consistent (conf 0.833)</li>
+<li>Arbitration: <strong>Fuse</strong> (w_LTP=0.48, w_STI=0.52); counterfactual driver: Jointly-driven</li>
+<li>Target: The Waterboy (1998) (rank 263, hit@10=False); top-5: Jumanji  (2017); The Boss Baby (2017); Bad Moms (2016); Arrival  (2016); Wonder Woman  (2017)</li>
 </ul>
 <h2>13. Hypothesis verdicts</h2>
 <table>
@@ -3102,125 +6401,209 @@
 <td>H1 (overall)</td>
 <td>AIPA (full) vs LTP-only</td>
 <td>SUPPORTED</td>
-<td>0.0371</td>
-<td>0.0036</td>
+<td>0.0399</td>
+<td>0.0073</td>
 </tr>
 <tr>
 <td>H1 (overall)</td>
 <td>AIPA (full) vs STI-only</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>-0.0121</td>
+<td>-0.0037</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H1 (overall)</td>
 <td>AIPA (full) vs Naive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0019</td>
+<td>0.0005</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H1 (overall)</td>
 <td>AIPA (full) vs Adaptive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>-0.0028</td>
+<td>-0.0014</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H1 (overall)</td>
 <td>AIPA (full) vs Sequential (GRU)</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0251</td>
-<td>0.4437</td>
+<td>0.0269</td>
+<td>0.2171</td>
 </tr>
 <tr>
 <td>H1 (overall)</td>
 <td>AIPA (full) vs Conversation-aware</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0125</td>
+<td>0.0153</td>
 <td>1.0000</td>
 </tr>
 <tr>
-<td>H2 (conflict_natural)</td>
+<td>H1 (overall)</td>
+<td>AIPA (full) vs SASRec</td>
+<td>SUPPORTED</td>
+<td>0.0348</td>
+<td>0.0326</td>
+</tr>
+<tr>
+<td>H1 (overall)</td>
+<td>AIPA (full) vs KBRD-style</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>-0.0065</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_strict)</td>
 <td>AIPA (full) vs LTP-only</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0403</td>
+<td>0.0726</td>
 <td>1.0000</td>
 </tr>
 <tr>
-<td>H2 (conflict_natural)</td>
+<td>H2 (conflict_natural_strict)</td>
 <td>AIPA (full) vs STI-only</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>-0.0565</td>
+<td>0.0242</td>
 <td>1.0000</td>
 </tr>
 <tr>
-<td>H2 (conflict_natural)</td>
+<td>H2 (conflict_natural_strict)</td>
 <td>AIPA (full) vs Naive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>-0.0081</td>
+<td>0.0242</td>
 <td>1.0000</td>
 </tr>
 <tr>
-<td>H2 (conflict_natural)</td>
+<td>H2 (conflict_natural_strict)</td>
 <td>AIPA (full) vs Adaptive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
 <td>0.0081</td>
 <td>1.0000</td>
 </tr>
 <tr>
+<td>H2 (conflict_natural_strict)</td>
+<td>AIPA (full) vs SASRec</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>0.0726</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_strict)</td>
+<td>AIPA (full) vs KBRD-style</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>-0.0323</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs LTP-only</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>0.0625</td>
+<td>0.1196</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs STI-only</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>-0.0020</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs Naive fusion</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>0.0137</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs Adaptive fusion</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>0.0000</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs SASRec</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>0.0469</td>
+<td>0.6291</td>
+</tr>
+<tr>
+<td>H2 (conflict_natural_broad)</td>
+<td>AIPA (full) vs KBRD-style</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>-0.0254</td>
+<td>1.0000</td>
+</tr>
+<tr>
 <td>H2 (conflict_synthetic)</td>
 <td>AIPA (full) vs LTP-only</td>
 <td>SUPPORTED</td>
-<td>0.1859</td>
-<td>0.0010</td>
+<td>0.1795</td>
+<td>0.0020</td>
 </tr>
 <tr>
 <td>H2 (conflict_synthetic)</td>
 <td>AIPA (full) vs STI-only</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0000</td>
+<td>-0.0256</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H2 (conflict_synthetic)</td>
 <td>AIPA (full) vs Naive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0385</td>
+<td>-0.0385</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H2 (conflict_synthetic)</td>
 <td>AIPA (full) vs Adaptive fusion</td>
 <td>NOT SUPPORTED (difference not significant)</td>
-<td>0.0192</td>
+<td>-0.0385</td>
+<td>1.0000</td>
+</tr>
+<tr>
+<td>H2 (conflict_synthetic)</td>
+<td>AIPA (full) vs SASRec</td>
+<td>SUPPORTED</td>
+<td>0.1603</td>
+<td>0.0091</td>
+</tr>
+<tr>
+<td>H2 (conflict_synthetic)</td>
+<td>AIPA (full) vs KBRD-style</td>
+<td>NOT SUPPORTED (difference not significant)</td>
+<td>-0.0513</td>
 <td>1.0000</td>
 </tr>
 <tr>
 <td>H4 (relationship classifier)</td>
 <td>macro-F1 on natural (weak labels)</td>
 <td>SUPPORTED</td>
-<td>0.5242</td>
+<td>0.5512</td>
 <td>n/a</td>
 </tr>
 <tr>
 <td>H4 (relationship classifier)</td>
 <td>macro-F1 on synthetic (controlled)</td>
 <td>SUPPORTED</td>
-<td>0.5875</td>
+<td>0.5853</td>
 <td>n/a</td>
 </tr>
 </tbody>
 </table>
 <h3>Objective conclusion</h3>
-<p>H1 (overall improvement) is supported in 1/6 baseline comparisons and contradicted in 0. H2 (conflict-specific gain) is supported in 1/8 comparisons and contradicted in 0. The evidence is consistent with the central claim that arbitration helps <em>specifically</em> under conflict, although it rests partly on weak or synthetic labels. Quick mode uses a data subset and few epochs; these verdicts are provisional.</p>
+<p>H1 (overall improvement) is supported in 2/8 baseline comparisons and contradicted in 0. H2 (conflict-specific gain) is supported in 2/18 comparisons and contradicted in 0. The evidence is consistent with the central claim that arbitration helps <em>specifically</em> under conflict, although it rests partly on weak or synthetic labels. Quick mode uses a data subset and few epochs; these verdicts are provisional.</p>
 <h2>14. Limitations and threats to validity</h2>
 <ul>
 <li>Natural relationship labels are weak heuristics (genre distributions + lexical markers); relationship metrics on the natural subset measure agreement with those heuristics, not with human judgement.</li>
 <li>Synthetic Conflict/Override targets are sampled, popularity-weighted items of the injected genre; success on that subset shows intent-following, not recommendation accuracy.</li>
 <li>ReDial seekers are crowd workers; cross-session history reflects worker behaviour across HITs, an implementation assumption standing in for real long-term preference. Ordering by <code>conversationId</code> is assumed chronological.</li>
 <li>MovieLens genre joins by normalised title/year can mismatch remakes or same-titled films.</li>
-<li>Baselines are approximate re-implementations; no claim of reproducing MRGE, DiffLSRec or other published systems is made.</li>
+<li>Baselines are approximate re-implementations; no claim of reproducing MRGE, DiffLSRec, SASRec, KBRD or other published systems is made (KBRD-style omits the external knowledge graph and response generator).</li>
 <li>Counterfactual diagnostics are interventions on a trained model, not causal effects on users.</li>
 <li>The novelty assessment in the accompanying design document is scoped; a broader literature search is needed before claiming AIPA-CRS is globally unprecedented.</li>
 <li>This run used run mode <code>quick</code> on a data subset with few epochs; results are indicative only and the <code>full</code> mode should be run before any publication claim.</li>
@@ -3290,8 +6673,17 @@
 <td>pyyaml</td>
 <td>6.0.3</td>
 </tr>
+<tr>
+<td>sentence-transformers</td>
+<td>5.7.0</td>
+</tr>
+<tr>
+<td>transformers</td>
+<td>5.16.1</td>
+</tr>
 </tbody>
 </table>
+<p>Text encoder: <code>tfidf-svd</code> (64-d, TF-IDF + SVD fitted on the training split); encoding time 1.17 s, 0 strings newly encoded, 0 served from the on-disk cache.</p>
 <p>Configuration (<code>configs/default.yaml</code>, effective values):</p>
 <table>
 <thead>
@@ -3340,6 +6732,22 @@
 <tr>
 <td>text_dim</td>
 <td>64</td>
+</tr>
+<tr>
+<td>encoder_batch_size</td>
+<td>128</td>
+</tr>
+<tr>
+<td>text_cache</td>
+<td>True</td>
+</tr>
+<tr>
+<td>embedding_fallback</td>
+<td>True</td>
+</tr>
+<tr>
+<td>item_text_genres</td>
+<td>True</td>
 </tr>
 <tr>
 <td>hidden_dim</td>
@@ -3418,8 +6826,32 @@
 <td>200</td>
 </tr>
 <tr>
+<td>permutation_samples</td>
+<td>2000</td>
+</tr>
+<tr>
 <td>min_history_for_ltp</td>
 <td>3</td>
+</tr>
+<tr>
+<td>conflict_strict_labels</td>
+<td>['Conflict', 'Override']</td>
+</tr>
+<tr>
+<td>disagreement_conf_min</td>
+<td>0.6</td>
+</tr>
+<tr>
+<td>disagreement_js_min</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>history_buckets</td>
+<td>[['cold', 0, 2], ['short', 3, 9], ['mid', 10, 24], ['long', 25, None]]</td>
+</tr>
+<tr>
+<td>genre_breakdown_top</td>
+<td>8</td>
 </tr>
 <tr>
 <td>cf_tau</td>
@@ -3438,12 +6870,60 @@
 <td>0.3</td>
 </tr>
 <tr>
+<td>persistence_k_grid</td>
+<td>[1, 2, 3]</td>
+</tr>
+<tr>
+<td>persistence_min_sessions</td>
+<td>3</td>
+</tr>
+<tr>
+<td>criteria_alpha</td>
+<td>0.05</td>
+</tr>
+<tr>
+<td>criteria_macro_f1_min</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>criteria_conflict_f1_min</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>criteria_clarification_precision_min</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>criteria_unnecessary_clarification_max</td>
+<td>0.1</td>
+</tr>
+<tr>
 <td>lambda_rel</td>
 <td>0.5</td>
 </tr>
 <tr>
 <td>lambda_act</td>
 <td>0.3</td>
+</tr>
+<tr>
+<td>sasrec_blocks</td>
+<td>2</td>
+</tr>
+<tr>
+<td>sasrec_heads</td>
+<td>2</td>
+</tr>
+<tr>
+<td>sasrec_dropout</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>kbrd_pooling</td>
+<td>attention</td>
+</tr>
+<tr>
+<td>disabled_models</td>
+<td>[]</td>
 </tr>
 <tr>
 <td>n_case_studies</td>
@@ -3480,6 +6960,10 @@
 <td>movies_with_mentions.csv</td>
 <td>14006c0c2368e6686c441c2cd7a19e20e2e23a83</td>
 </tr>
+<tr>
+<td>movies.csv</td>
+<td>20d8b843217b613669b0a8ab3d938823002956d2</td>
+</tr>
 </tbody>
 </table>
 <h2>16. Component validation</h2>
@@ -3495,7 +6979,7 @@
 <tr>
 <td>dataset acquisition &amp; validation</td>
 <td>PASS</td>
-<td>3 files hashed</td>
+<td>4 files hashed</td>
 </tr>
 <tr>
 <td>instance construction (leak-free)</td>
@@ -3548,6 +7032,16 @@
 <td></td>
 </tr>
 <tr>
+<td>baseline: SASRec</td>
+<td>PASS</td>
+<td></td>
+</tr>
+<tr>
+<td>baseline: KBRD-style</td>
+<td>PASS</td>
+<td></td>
+</tr>
+<tr>
 <td>model: AIPA w/o relationship</td>
 <td>PASS</td>
 <td></td>
@@ -3595,7 +7089,7 @@
 <tr>
 <td>temporal persistence tracker</td>
 <td>PASS</td>
-<td>33 shifts detected</td>
+<td>52 shifts detected</td>
 </tr>
 <tr>
 <td>ranking metrics + bootstrap CI</td>
@@ -3619,6 +7113,26 @@
 </tr>
 <tr>
 <td>sensitivity analyses</td>
+<td>PASS</td>
+<td></td>
+</tr>
+<tr>
+<td>strict + broad natural conflict subsets</td>
+<td>PASS</td>
+<td>strict: n=62, broad: n=256, broad_only: n=194, synthetic_conflict: n=78, natural: n=1077</td>
+</tr>
+<tr>
+<td>history-bucket / genre breakdown</td>
+<td>PASS</td>
+<td></td>
+</tr>
+<tr>
+<td>persistence effect on affected subset</td>
+<td>PASS</td>
+<td>n_affected=87</td>
+</tr>
+<tr>
+<td>success criteria table</td>
 <td>PASS</td>
 <td></td>
 </tr>
@@ -3650,7 +7164,7 @@
 <tr>
 <td>figures</td>
 <td>PASS</td>
-<td>17 figures in /home/ubuntu/AIPA-CRS/outputs/figures</td>
+<td>21 figures in /home/ubuntu/AIPA-CRS/outputs/figures</td>
 </tr>
 <tr>
 <td>tables</td>
