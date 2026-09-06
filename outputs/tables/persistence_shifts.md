@@ -1,54 +1,870 @@
-| model                   |   seed |   seeker_id | genre   |   conv_id |
-|:------------------------|-------:|------------:|:--------|----------:|
-| AIPA w/o relationship   |     42 |        1008 | Horror  |     21026 |
-| AIPA w/o relationship   |     42 |        1035 | Comedy  |     22801 |
-| AIPA w/o relationship   |     42 |        1046 | Musical |     22865 |
-| AIPA w/o relationship   |     42 |        1087 | War     |     22841 |
-| AIPA w/o counterfactual |     42 |        1008 | Horror  |     21026 |
-| AIPA w/o counterfactual |     42 |        1035 | Comedy  |     22801 |
-| AIPA w/o counterfactual |     42 |        1087 | War     |     22841 |
-| AIPA w/o counterfactual |     42 |         959 | Romance |     22159 |
-| AIPA w/o clarification  |     42 |        1011 | Horror  |     21073 |
-| AIPA w/o clarification  |     42 |        1034 | Comedy  |     22026 |
-| AIPA w/o clarification  |     42 |        1035 | Comedy  |     22801 |
-| AIPA w/o clarification  |     42 |        1054 | Comedy  |     22083 |
-| AIPA w/o clarification  |     42 |        1087 | War     |     22841 |
-| AIPA w/o clarification  |     42 |         959 | Romance |     22159 |
-| AIPA w/o clarification  |     42 |         972 | Comedy  |     22348 |
-| AIPA w/o clarification  |     42 |         979 | Musical |     21644 |
-| AIPA (rule policy)      |     42 |        1035 | Comedy  |     22801 |
-| AIPA (rule policy)      |     42 |        1087 | War     |     22841 |
-| AIPA (rule policy)      |     42 |         959 | Romance |     22159 |
-| AIPA (full)             |     42 |        1008 | Horror  |     21026 |
-| AIPA (full)             |     42 |        1034 | Comedy  |     22026 |
-| AIPA (full)             |     42 |        1035 | Comedy  |     22801 |
-| AIPA (full)             |     42 |        1054 | Comedy  |     22083 |
-| AIPA (full)             |     42 |        1087 | War     |     22841 |
-| AIPA (full)             |     42 |         959 | Romance |     22159 |
-| AIPA (full)             |     42 |         972 | Comedy  |     22348 |
-| AIPA (full)             |     42 |         979 | Musical |     21644 |
-| AIPA w/o relationship   |      7 |        1034 | Comedy  |     22026 |
-| AIPA w/o relationship   |      7 |        1046 | Musical |     22865 |
-| AIPA w/o relationship   |      7 |        1087 | War     |     22841 |
-| AIPA w/o relationship   |      7 |         959 | Romance |     22159 |
-| AIPA w/o relationship   |      7 |         972 | Comedy  |     22169 |
-| AIPA w/o counterfactual |      7 |        1034 | Comedy  |     22026 |
-| AIPA w/o counterfactual |      7 |        1087 | War     |     22841 |
-| AIPA w/o counterfactual |      7 |         959 | Romance |     22159 |
-| AIPA w/o clarification  |      7 |        1034 | Comedy  |     22026 |
-| AIPA w/o clarification  |      7 |        1087 | War     |     22841 |
-| AIPA w/o clarification  |      7 |        1087 | Comedy  |     22972 |
-| AIPA w/o clarification  |      7 |         972 | Comedy  |     22190 |
-| AIPA (rule policy)      |      7 |        1008 | Horror  |     21026 |
-| AIPA (rule policy)      |      7 |        1009 | Crime   |     21799 |
-| AIPA (rule policy)      |      7 |        1011 | Horror  |     21073 |
-| AIPA (rule policy)      |      7 |        1034 | Comedy  |     21780 |
-| AIPA (rule policy)      |      7 |        1034 | Crime   |     22073 |
-| AIPA (rule policy)      |      7 |        1054 | Crime   |     21974 |
-| AIPA (rule policy)      |      7 |        1087 | War     |     22841 |
-| AIPA (rule policy)      |      7 |        1087 | Comedy  |     22972 |
-| AIPA (rule policy)      |      7 |         972 | Comedy  |     22169 |
-| AIPA (full)             |      7 |        1034 | Comedy  |     22026 |
-| AIPA (full)             |      7 |        1087 | War     |     22841 |
-| AIPA (full)             |      7 |         959 | Romance |     22159 |
-| AIPA (full)             |      7 |         972 | Comedy  |     22190 |
+| model                   |   seed |   seeker_id | genre     |   conv_id |
+|:------------------------|-------:|------------:|:----------|----------:|
+| AIPA w/o relationship   |     42 |        1009 | Crime     |     21225 |
+| AIPA w/o relationship   |     42 |        1009 | Comedy    |     21825 |
+| AIPA w/o relationship   |     42 |        1011 | Comedy    |     21113 |
+| AIPA w/o relationship   |     42 |        1011 | Drama     |     21683 |
+| AIPA w/o relationship   |     42 |        1011 | Horror    |     21718 |
+| AIPA w/o relationship   |     42 |        1016 | Horror    |     20930 |
+| AIPA w/o relationship   |     42 |        1016 | Action    |     21728 |
+| AIPA w/o relationship   |     42 |        1022 | Comedy    |     21593 |
+| AIPA w/o relationship   |     42 |        1022 | Horror    |     21678 |
+| AIPA w/o relationship   |     42 |        1024 | Animation |     21627 |
+| AIPA w/o relationship   |     42 |        1034 | Comedy    |     21335 |
+| AIPA w/o relationship   |     42 |        1034 | Horror    |     21958 |
+| AIPA w/o relationship   |     42 |        1034 | Drama     |     22037 |
+| AIPA w/o relationship   |     42 |        1035 | Comedy    |     21317 |
+| AIPA w/o relationship   |     42 |        1035 | Horror    |     22099 |
+| AIPA w/o relationship   |     42 |        1035 | Romance   |     22922 |
+| AIPA w/o relationship   |     42 |        1046 | Comedy    |     22959 |
+| AIPA w/o relationship   |     42 |        1048 | Animation |     22919 |
+| AIPA w/o relationship   |     42 |        1053 | Horror    |     21877 |
+| AIPA w/o relationship   |     42 |        1057 | Crime     |     22134 |
+| AIPA w/o relationship   |     42 |        1074 | Horror    |     22354 |
+| AIPA w/o relationship   |     42 |        1087 | War       |     22721 |
+| AIPA w/o relationship   |     42 |        1087 | Animation |     22869 |
+| AIPA w/o relationship   |     42 |        1087 | Comedy    |     22972 |
+| AIPA w/o relationship   |     42 |        1087 | Action    |     23061 |
+| AIPA w/o relationship   |     42 |        1087 | Horror    |     23110 |
+| AIPA w/o relationship   |     42 |        1093 | Action    |     22937 |
+| AIPA w/o relationship   |     42 |        1093 | Horror    |     23050 |
+| AIPA w/o relationship   |     42 |        1099 | Horror    |     23092 |
+| AIPA w/o relationship   |     42 |        1099 | Animation |     23093 |
+| AIPA w/o relationship   |     42 |        1110 | Action    |     23277 |
+| AIPA w/o relationship   |     42 |         959 | Horror    |     21904 |
+| AIPA w/o relationship   |     42 |         960 | Horror    |     20895 |
+| AIPA w/o relationship   |     42 |         961 | Horror    |     20095 |
+| AIPA w/o relationship   |     42 |         972 | Comedy    |     22169 |
+| AIPA w/o relationship   |     42 |         976 | Comedy    |     20543 |
+| AIPA w/o relationship   |     42 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |     42 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |     42 |         997 | Comedy    |     21065 |
+| AIPA w/o counterfactual |     42 |        1009 | Crime     |     21225 |
+| AIPA w/o counterfactual |     42 |        1009 | Comedy    |     21825 |
+| AIPA w/o counterfactual |     42 |        1011 | Comedy    |     21113 |
+| AIPA w/o counterfactual |     42 |        1011 | Drama     |     21683 |
+| AIPA w/o counterfactual |     42 |        1011 | Horror    |     21718 |
+| AIPA w/o counterfactual |     42 |        1016 | Horror    |     20930 |
+| AIPA w/o counterfactual |     42 |        1022 | Horror    |     21678 |
+| AIPA w/o counterfactual |     42 |        1034 | Comedy    |     21400 |
+| AIPA w/o counterfactual |     42 |        1034 | Drama     |     22037 |
+| AIPA w/o counterfactual |     42 |        1034 | Horror    |     22052 |
+| AIPA w/o counterfactual |     42 |        1035 | Comedy    |     21317 |
+| AIPA w/o counterfactual |     42 |        1035 | Horror    |     22099 |
+| AIPA w/o counterfactual |     42 |        1035 | Children  |     22130 |
+| AIPA w/o counterfactual |     42 |        1035 | Romance   |     22922 |
+| AIPA w/o counterfactual |     42 |        1046 | Comedy    |     22135 |
+| AIPA w/o counterfactual |     42 |        1048 | Animation |     22919 |
+| AIPA w/o counterfactual |     42 |        1053 | Horror    |     21877 |
+| AIPA w/o counterfactual |     42 |        1053 | Action    |     22139 |
+| AIPA w/o counterfactual |     42 |        1054 | Action    |     21918 |
+| AIPA w/o counterfactual |     42 |        1059 | Comedy    |     23295 |
+| AIPA w/o counterfactual |     42 |        1074 | Horror    |     23249 |
+| AIPA w/o counterfactual |     42 |        1087 | War       |     22841 |
+| AIPA w/o counterfactual |     42 |        1087 | Animation |     22869 |
+| AIPA w/o counterfactual |     42 |        1087 | Comedy    |     22972 |
+| AIPA w/o counterfactual |     42 |        1087 | Horror    |     23110 |
+| AIPA w/o counterfactual |     42 |        1093 | Action    |     22937 |
+| AIPA w/o counterfactual |     42 |        1093 | Horror    |     23050 |
+| AIPA w/o counterfactual |     42 |        1099 | Horror    |     23092 |
+| AIPA w/o counterfactual |     42 |        1099 | Animation |     23093 |
+| AIPA w/o counterfactual |     42 |        1110 | Action    |     23277 |
+| AIPA w/o counterfactual |     42 |         959 | Horror    |     21904 |
+| AIPA w/o counterfactual |     42 |         959 | Romance   |     22159 |
+| AIPA w/o counterfactual |     42 |         960 | Horror    |     20895 |
+| AIPA w/o counterfactual |     42 |         972 | Comedy    |     21504 |
+| AIPA w/o counterfactual |     42 |         976 | Comedy    |     20543 |
+| AIPA w/o counterfactual |     42 |         979 | Musical   |     21644 |
+| AIPA w/o counterfactual |     42 |         996 | Comedy    |     22739 |
+| AIPA w/o counterfactual |     42 |         997 | Horror    |     20780 |
+| AIPA w/o counterfactual |     42 |         997 | Comedy    |     21065 |
+| AIPA w/o clarification  |     42 |        1008 | Comedy    |     21914 |
+| AIPA w/o clarification  |     42 |        1009 | Comedy    |     22441 |
+| AIPA w/o clarification  |     42 |        1011 | Comedy    |     21113 |
+| AIPA w/o clarification  |     42 |        1011 | Drama     |     21562 |
+| AIPA w/o clarification  |     42 |        1011 | Horror    |     21718 |
+| AIPA w/o clarification  |     42 |        1016 | Horror    |     20930 |
+| AIPA w/o clarification  |     42 |        1022 | Comedy    |     21593 |
+| AIPA w/o clarification  |     42 |        1024 | Animation |     21627 |
+| AIPA w/o clarification  |     42 |        1034 | Romance   |     21378 |
+| AIPA w/o clarification  |     42 |        1034 | Comedy    |     21400 |
+| AIPA w/o clarification  |     42 |        1034 | Horror    |     22052 |
+| AIPA w/o clarification  |     42 |        1035 | Comedy    |     21317 |
+| AIPA w/o clarification  |     42 |        1035 | Horror    |     22099 |
+| AIPA w/o clarification  |     42 |        1035 | Children  |     22130 |
+| AIPA w/o clarification  |     42 |        1035 | Romance   |     22922 |
+| AIPA w/o clarification  |     42 |        1048 | Animation |     22919 |
+| AIPA w/o clarification  |     42 |        1053 | Horror    |     21877 |
+| AIPA w/o clarification  |     42 |        1054 | Action    |     21918 |
+| AIPA w/o clarification  |     42 |        1059 | Comedy    |     23295 |
+| AIPA w/o clarification  |     42 |        1074 | Horror    |     23249 |
+| AIPA w/o clarification  |     42 |        1087 | Romance   |     22636 |
+| AIPA w/o clarification  |     42 |        1087 | Action    |     22711 |
+| AIPA w/o clarification  |     42 |        1087 | War       |     22841 |
+| AIPA w/o clarification  |     42 |        1087 | Animation |     22869 |
+| AIPA w/o clarification  |     42 |        1087 | Comedy    |     22934 |
+| AIPA w/o clarification  |     42 |        1087 | Horror    |     23110 |
+| AIPA w/o clarification  |     42 |        1093 | Action    |     22937 |
+| AIPA w/o clarification  |     42 |        1093 | Horror    |     23050 |
+| AIPA w/o clarification  |     42 |        1099 | Horror    |     23092 |
+| AIPA w/o clarification  |     42 |        1110 | Action    |     23277 |
+| AIPA w/o clarification  |     42 |         959 | Horror    |     21904 |
+| AIPA w/o clarification  |     42 |         959 | Romance   |     22159 |
+| AIPA w/o clarification  |     42 |         959 | Comedy    |     22409 |
+| AIPA w/o clarification  |     42 |         960 | Horror    |     20971 |
+| AIPA w/o clarification  |     42 |         972 | Comedy    |     22169 |
+| AIPA w/o clarification  |     42 |         976 | Comedy    |     20543 |
+| AIPA w/o clarification  |     42 |         979 | Musical   |     21644 |
+| AIPA w/o clarification  |     42 |         996 | Comedy    |     22739 |
+| AIPA w/o clarification  |     42 |         997 | Comedy    |     20711 |
+| AIPA w/o clarification  |     42 |         997 | Horror    |     20780 |
+| AIPA w/o clarification  |     42 |         997 | Musical   |     21125 |
+| AIPA (rule policy)      |     42 |        1008 | Comedy    |     21009 |
+| AIPA (rule policy)      |     42 |        1009 | Crime     |     21225 |
+| AIPA (rule policy)      |     42 |        1009 | Comedy    |     22441 |
+| AIPA (rule policy)      |     42 |        1011 | Comedy    |     21113 |
+| AIPA (rule policy)      |     42 |        1011 | Drama     |     21683 |
+| AIPA (rule policy)      |     42 |        1011 | Horror    |     21718 |
+| AIPA (rule policy)      |     42 |        1016 | Drama     |     20836 |
+| AIPA (rule policy)      |     42 |        1022 | Comedy    |     21593 |
+| AIPA (rule policy)      |     42 |        1024 | Animation |     21627 |
+| AIPA (rule policy)      |     42 |        1034 | Comedy    |     21786 |
+| AIPA (rule policy)      |     42 |        1034 | Horror    |     21968 |
+| AIPA (rule policy)      |     42 |        1035 | Comedy    |     21317 |
+| AIPA (rule policy)      |     42 |        1035 | Horror    |     22099 |
+| AIPA (rule policy)      |     42 |        1035 | Children  |     22130 |
+| AIPA (rule policy)      |     42 |        1035 | Romance   |     22922 |
+| AIPA (rule policy)      |     42 |        1048 | Animation |     22919 |
+| AIPA (rule policy)      |     42 |        1053 | Horror    |     21877 |
+| AIPA (rule policy)      |     42 |        1053 | Action    |     22139 |
+| AIPA (rule policy)      |     42 |        1074 | Horror    |     22354 |
+| AIPA (rule policy)      |     42 |        1087 | Drama     |     22629 |
+| AIPA (rule policy)      |     42 |        1087 | Romance   |     22636 |
+| AIPA (rule policy)      |     42 |        1087 | Comedy    |     22934 |
+| AIPA (rule policy)      |     42 |        1087 | Horror    |     23110 |
+| AIPA (rule policy)      |     42 |        1087 | Animation |     23244 |
+| AIPA (rule policy)      |     42 |        1093 | Action    |     22937 |
+| AIPA (rule policy)      |     42 |        1093 | Horror    |     23050 |
+| AIPA (rule policy)      |     42 |        1099 | Horror    |     23092 |
+| AIPA (rule policy)      |     42 |         959 | Horror    |     21899 |
+| AIPA (rule policy)      |     42 |         959 | Comedy    |     22159 |
+| AIPA (rule policy)      |     42 |         960 | Horror    |     20895 |
+| AIPA (rule policy)      |     42 |         972 | Comedy    |     22169 |
+| AIPA (rule policy)      |     42 |         979 | Musical   |     21644 |
+| AIPA (rule policy)      |     42 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |     42 |         997 | Musical   |     20733 |
+| AIPA (rule policy)      |     42 |         997 | Horror    |     20780 |
+| AIPA (full)             |     42 |        1001 | Comedy    |     22257 |
+| AIPA (full)             |     42 |        1008 | Comedy    |     21009 |
+| AIPA (full)             |     42 |        1009 | Comedy    |     21825 |
+| AIPA (full)             |     42 |        1011 | Comedy    |     21113 |
+| AIPA (full)             |     42 |        1011 | Horror    |     21718 |
+| AIPA (full)             |     42 |        1016 | Horror    |     20930 |
+| AIPA (full)             |     42 |        1024 | Animation |     21627 |
+| AIPA (full)             |     42 |        1034 | Comedy    |     21335 |
+| AIPA (full)             |     42 |        1034 | Romance   |     21933 |
+| AIPA (full)             |     42 |        1034 | Horror    |     21958 |
+| AIPA (full)             |     42 |        1035 | Comedy    |     21317 |
+| AIPA (full)             |     42 |        1035 | Horror    |     22099 |
+| AIPA (full)             |     42 |        1035 | Romance   |     22922 |
+| AIPA (full)             |     42 |        1046 | Comedy    |     22959 |
+| AIPA (full)             |     42 |        1048 | Animation |     22919 |
+| AIPA (full)             |     42 |        1053 | Horror    |     21877 |
+| AIPA (full)             |     42 |        1054 | Action    |     21918 |
+| AIPA (full)             |     42 |        1059 | Comedy    |     23295 |
+| AIPA (full)             |     42 |        1087 | Comedy    |     22619 |
+| AIPA (full)             |     42 |        1087 | Romance   |     22636 |
+| AIPA (full)             |     42 |        1087 | Action    |     22711 |
+| AIPA (full)             |     42 |        1087 | War       |     22841 |
+| AIPA (full)             |     42 |        1087 | Animation |     22869 |
+| AIPA (full)             |     42 |        1087 | Horror    |     23110 |
+| AIPA (full)             |     42 |        1093 | Action    |     22937 |
+| AIPA (full)             |     42 |        1093 | Horror    |     23050 |
+| AIPA (full)             |     42 |        1099 | Horror    |     23092 |
+| AIPA (full)             |     42 |         959 | Horror    |     21899 |
+| AIPA (full)             |     42 |         959 | Comedy    |     22409 |
+| AIPA (full)             |     42 |         960 | Horror    |     20895 |
+| AIPA (full)             |     42 |         972 | Comedy    |     22190 |
+| AIPA (full)             |     42 |         979 | Musical   |     21644 |
+| AIPA (full)             |     42 |         996 | Comedy    |     22739 |
+| AIPA (full)             |     42 |         997 | Musical   |     20733 |
+| AIPA (full)             |     42 |         997 | Horror    |     20780 |
+| AIPA (full)             |     42 |         997 | Comedy    |     21065 |
+| AIPA (full)             |     42 |         997 | Action    |     21069 |
+| AIPA w/o relationship   |      7 |        1011 | Horror    |     21718 |
+| AIPA w/o relationship   |      7 |        1016 | Horror    |     20930 |
+| AIPA w/o relationship   |      7 |        1022 | Comedy    |     21379 |
+| AIPA w/o relationship   |      7 |        1034 | Comedy    |     21786 |
+| AIPA w/o relationship   |      7 |        1034 | Horror    |     22078 |
+| AIPA w/o relationship   |      7 |        1035 | Comedy    |     22028 |
+| AIPA w/o relationship   |      7 |        1035 | Horror    |     22099 |
+| AIPA w/o relationship   |      7 |        1035 | Romance   |     22922 |
+| AIPA w/o relationship   |      7 |        1049 | Musical   |     21963 |
+| AIPA w/o relationship   |      7 |        1053 | Horror    |     21877 |
+| AIPA w/o relationship   |      7 |        1057 | Action    |     22211 |
+| AIPA w/o relationship   |      7 |        1074 | Horror    |     22354 |
+| AIPA w/o relationship   |      7 |        1083 | Drama     |     23319 |
+| AIPA w/o relationship   |      7 |        1087 | Romance   |     22636 |
+| AIPA w/o relationship   |      7 |        1087 | War       |     22841 |
+| AIPA w/o relationship   |      7 |        1087 | Comedy    |     22934 |
+| AIPA w/o relationship   |      7 |        1087 | Horror    |     22958 |
+| AIPA w/o relationship   |      7 |        1087 | Action    |     23061 |
+| AIPA w/o relationship   |      7 |        1093 | Action    |     22937 |
+| AIPA w/o relationship   |      7 |        1093 | Horror    |     23050 |
+| AIPA w/o relationship   |      7 |        1099 | Horror    |     23092 |
+| AIPA w/o relationship   |      7 |         959 | Comedy    |     22309 |
+| AIPA w/o relationship   |      7 |         959 | Horror    |     22313 |
+| AIPA w/o relationship   |      7 |         960 | Horror    |     20895 |
+| AIPA w/o relationship   |      7 |         961 | Horror    |     20095 |
+| AIPA w/o relationship   |      7 |         972 | Comedy    |     22169 |
+| AIPA w/o relationship   |      7 |         979 | Musical   |     21644 |
+| AIPA w/o relationship   |      7 |         991 | Drama     |     21239 |
+| AIPA w/o relationship   |      7 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |      7 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |      7 |         997 | Action    |     20780 |
+| AIPA w/o counterfactual |      7 |        1011 | Comedy    |     21113 |
+| AIPA w/o counterfactual |      7 |        1011 | Drama     |     21683 |
+| AIPA w/o counterfactual |      7 |        1011 | Horror    |     21718 |
+| AIPA w/o counterfactual |      7 |        1016 | Horror    |     20930 |
+| AIPA w/o counterfactual |      7 |        1022 | Comedy    |     21379 |
+| AIPA w/o counterfactual |      7 |        1022 | Children  |     21597 |
+| AIPA w/o counterfactual |      7 |        1024 | Horror    |     21623 |
+| AIPA w/o counterfactual |      7 |        1024 | Animation |     21627 |
+| AIPA w/o counterfactual |      7 |        1034 | Comedy    |     21341 |
+| AIPA w/o counterfactual |      7 |        1034 | Romance   |     21378 |
+| AIPA w/o counterfactual |      7 |        1034 | Drama     |     21807 |
+| AIPA w/o counterfactual |      7 |        1034 | Horror    |     22052 |
+| AIPA w/o counterfactual |      7 |        1035 | Comedy    |     21317 |
+| AIPA w/o counterfactual |      7 |        1035 | Horror    |     22099 |
+| AIPA w/o counterfactual |      7 |        1035 | Children  |     22130 |
+| AIPA w/o counterfactual |      7 |        1035 | Romance   |     22922 |
+| AIPA w/o counterfactual |      7 |        1046 | Comedy    |     22135 |
+| AIPA w/o counterfactual |      7 |        1048 | Animation |     22919 |
+| AIPA w/o counterfactual |      7 |        1049 | Drama     |     21963 |
+| AIPA w/o counterfactual |      7 |        1053 | Horror    |     21877 |
+| AIPA w/o counterfactual |      7 |        1054 | Action    |     21918 |
+| AIPA w/o counterfactual |      7 |        1059 | Comedy    |     23295 |
+| AIPA w/o counterfactual |      7 |        1074 | Horror    |     22354 |
+| AIPA w/o counterfactual |      7 |        1087 | Comedy    |     22619 |
+| AIPA w/o counterfactual |      7 |        1087 | Romance   |     22636 |
+| AIPA w/o counterfactual |      7 |        1087 | War       |     22841 |
+| AIPA w/o counterfactual |      7 |        1087 | Horror    |     22915 |
+| AIPA w/o counterfactual |      7 |        1087 | Animation |     23250 |
+| AIPA w/o counterfactual |      7 |        1093 | Action    |     22937 |
+| AIPA w/o counterfactual |      7 |        1093 | Horror    |     23050 |
+| AIPA w/o counterfactual |      7 |        1099 | Horror    |     23092 |
+| AIPA w/o counterfactual |      7 |         959 | Comedy    |     22309 |
+| AIPA w/o counterfactual |      7 |         959 | Horror    |     22313 |
+| AIPA w/o counterfactual |      7 |         960 | Horror    |     20895 |
+| AIPA w/o counterfactual |      7 |         961 | Comedy    |     20054 |
+| AIPA w/o counterfactual |      7 |         961 | Horror    |     20095 |
+| AIPA w/o counterfactual |      7 |         972 | Comedy    |     22169 |
+| AIPA w/o counterfactual |      7 |         979 | Musical   |     21644 |
+| AIPA w/o counterfactual |      7 |         996 | Comedy    |     22739 |
+| AIPA w/o counterfactual |      7 |         997 | Horror    |     20780 |
+| AIPA w/o clarification  |      7 |        1008 | Comedy    |     21009 |
+| AIPA w/o clarification  |      7 |        1009 | Crime     |     21225 |
+| AIPA w/o clarification  |      7 |        1009 | Comedy    |     22441 |
+| AIPA w/o clarification  |      7 |        1011 | Comedy    |     21113 |
+| AIPA w/o clarification  |      7 |        1011 | Horror    |     21718 |
+| AIPA w/o clarification  |      7 |        1016 | Animation |     20908 |
+| AIPA w/o clarification  |      7 |        1022 | Comedy    |     21379 |
+| AIPA w/o clarification  |      7 |        1022 | Children  |     21597 |
+| AIPA w/o clarification  |      7 |        1024 | Horror    |     21623 |
+| AIPA w/o clarification  |      7 |        1024 | Animation |     21627 |
+| AIPA w/o clarification  |      7 |        1034 | Comedy    |     21341 |
+| AIPA w/o clarification  |      7 |        1034 | Romance   |     21933 |
+| AIPA w/o clarification  |      7 |        1034 | Drama     |     22037 |
+| AIPA w/o clarification  |      7 |        1034 | Horror    |     22052 |
+| AIPA w/o clarification  |      7 |        1035 | Comedy    |     21317 |
+| AIPA w/o clarification  |      7 |        1035 | Horror    |     22099 |
+| AIPA w/o clarification  |      7 |        1035 | Children  |     22130 |
+| AIPA w/o clarification  |      7 |        1039 | Comedy    |     21872 |
+| AIPA w/o clarification  |      7 |        1046 | Comedy    |     22135 |
+| AIPA w/o clarification  |      7 |        1046 | Musical   |     22865 |
+| AIPA w/o clarification  |      7 |        1048 | Animation |     22919 |
+| AIPA w/o clarification  |      7 |        1053 | Horror    |     21877 |
+| AIPA w/o clarification  |      7 |        1057 | Drama     |     21910 |
+| AIPA w/o clarification  |      7 |        1059 | Action    |     23264 |
+| AIPA w/o clarification  |      7 |        1059 | Comedy    |     23295 |
+| AIPA w/o clarification  |      7 |        1074 | Horror    |     22354 |
+| AIPA w/o clarification  |      7 |        1074 | Comedy    |     22403 |
+| AIPA w/o clarification  |      7 |        1087 | War       |     22841 |
+| AIPA w/o clarification  |      7 |        1087 | Animation |     22869 |
+| AIPA w/o clarification  |      7 |        1087 | Horror    |     22915 |
+| AIPA w/o clarification  |      7 |        1087 | Comedy    |     22934 |
+| AIPA w/o clarification  |      7 |        1093 | Action    |     22937 |
+| AIPA w/o clarification  |      7 |        1093 | Horror    |     23050 |
+| AIPA w/o clarification  |      7 |        1099 | Horror    |     23092 |
+| AIPA w/o clarification  |      7 |         959 | Horror    |     20411 |
+| AIPA w/o clarification  |      7 |         959 | Comedy    |     22309 |
+| AIPA w/o clarification  |      7 |         960 | Horror    |     20971 |
+| AIPA w/o clarification  |      7 |         960 | Action    |     21015 |
+| AIPA w/o clarification  |      7 |         961 | Comedy    |     20054 |
+| AIPA w/o clarification  |      7 |         961 | Horror    |     20055 |
+| AIPA w/o clarification  |      7 |         972 | Comedy    |     21504 |
+| AIPA w/o clarification  |      7 |         976 | Comedy    |     20545 |
+| AIPA w/o clarification  |      7 |         996 | Comedy    |     22739 |
+| AIPA w/o clarification  |      7 |         997 | Horror    |     20780 |
+| AIPA w/o clarification  |      7 |         997 | Musical   |     21125 |
+| AIPA (rule policy)      |      7 |        1011 | Comedy    |     21382 |
+| AIPA (rule policy)      |      7 |        1011 | Horror    |     21718 |
+| AIPA (rule policy)      |      7 |        1016 | Horror    |     20930 |
+| AIPA (rule policy)      |      7 |        1024 | Horror    |     21623 |
+| AIPA (rule policy)      |      7 |        1034 | Horror    |     21364 |
+| AIPA (rule policy)      |      7 |        1035 | Horror    |     22099 |
+| AIPA (rule policy)      |      7 |        1035 | Romance   |     22922 |
+| AIPA (rule policy)      |      7 |        1053 | Horror    |     21877 |
+| AIPA (rule policy)      |      7 |        1059 | Comedy    |     23295 |
+| AIPA (rule policy)      |      7 |        1074 | Horror    |     22354 |
+| AIPA (rule policy)      |      7 |        1087 | Comedy    |     22934 |
+| AIPA (rule policy)      |      7 |        1087 | Horror    |     23110 |
+| AIPA (rule policy)      |      7 |        1093 | Action    |     22937 |
+| AIPA (rule policy)      |      7 |        1093 | Horror    |     23050 |
+| AIPA (rule policy)      |      7 |        1099 | Horror    |     23092 |
+| AIPA (rule policy)      |      7 |         959 | Horror    |     21904 |
+| AIPA (rule policy)      |      7 |         960 | Horror    |     20971 |
+| AIPA (rule policy)      |      7 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |      7 |         997 | Horror    |     20780 |
+| AIPA (full)             |      7 |        1001 | Action    |     21269 |
+| AIPA (full)             |      7 |        1009 | Crime     |     21225 |
+| AIPA (full)             |      7 |        1009 | Comedy    |     22441 |
+| AIPA (full)             |      7 |        1011 | Comedy    |     21382 |
+| AIPA (full)             |      7 |        1011 | Drama     |     21683 |
+| AIPA (full)             |      7 |        1011 | Horror    |     21718 |
+| AIPA (full)             |      7 |        1016 | Action    |     20930 |
+| AIPA (full)             |      7 |        1016 | Horror    |     20930 |
+| AIPA (full)             |      7 |        1022 | Comedy    |     21379 |
+| AIPA (full)             |      7 |        1024 | Horror    |     21623 |
+| AIPA (full)             |      7 |        1034 | Comedy    |     21341 |
+| AIPA (full)             |      7 |        1034 | Horror    |     21364 |
+| AIPA (full)             |      7 |        1034 | Romance   |     21933 |
+| AIPA (full)             |      7 |        1034 | Drama     |     22037 |
+| AIPA (full)             |      7 |        1034 | Musical   |     22066 |
+| AIPA (full)             |      7 |        1035 | Comedy    |     21317 |
+| AIPA (full)             |      7 |        1035 | Horror    |     22099 |
+| AIPA (full)             |      7 |        1035 | Children  |     22130 |
+| AIPA (full)             |      7 |        1039 | Comedy    |     21872 |
+| AIPA (full)             |      7 |        1046 | Comedy    |     22135 |
+| AIPA (full)             |      7 |        1048 | Animation |     22919 |
+| AIPA (full)             |      7 |        1053 | Horror    |     21877 |
+| AIPA (full)             |      7 |        1057 | Drama     |     21910 |
+| AIPA (full)             |      7 |        1074 | Horror    |     22354 |
+| AIPA (full)             |      7 |        1087 | Drama     |     22629 |
+| AIPA (full)             |      7 |        1087 | War       |     22841 |
+| AIPA (full)             |      7 |        1087 | Horror    |     22915 |
+| AIPA (full)             |      7 |        1087 | Comedy    |     22934 |
+| AIPA (full)             |      7 |        1088 | Horror    |     22612 |
+| AIPA (full)             |      7 |        1093 | Action    |     22937 |
+| AIPA (full)             |      7 |        1093 | Horror    |     23050 |
+| AIPA (full)             |      7 |        1099 | Horror    |     23092 |
+| AIPA (full)             |      7 |        1110 | Action    |     23277 |
+| AIPA (full)             |      7 |         959 | Horror    |     21899 |
+| AIPA (full)             |      7 |         959 | Comedy    |     22409 |
+| AIPA (full)             |      7 |         960 | Horror    |     20864 |
+| AIPA (full)             |      7 |         960 | Action    |     21015 |
+| AIPA (full)             |      7 |         961 | Horror    |     20053 |
+| AIPA (full)             |      7 |         972 | Comedy    |     22169 |
+| AIPA (full)             |      7 |         972 | Crime     |     22899 |
+| AIPA (full)             |      7 |         996 | Comedy    |     22739 |
+| AIPA (full)             |      7 |         997 | Horror    |     20780 |
+| AIPA (full)             |      7 |         997 | Musical   |     21125 |
+| AIPA w/o relationship   |    123 |        1009 | Comedy    |     22441 |
+| AIPA w/o relationship   |    123 |        1011 | Comedy    |     21121 |
+| AIPA w/o relationship   |    123 |        1011 | Animation |     21621 |
+| AIPA w/o relationship   |    123 |        1011 | Horror    |     21718 |
+| AIPA w/o relationship   |    123 |        1016 | Action    |     20930 |
+| AIPA w/o relationship   |    123 |        1016 | Animation |     21074 |
+| AIPA w/o relationship   |    123 |        1022 | Comedy    |     21379 |
+| AIPA w/o relationship   |    123 |        1024 | Animation |     21537 |
+| AIPA w/o relationship   |    123 |        1034 | Comedy    |     21786 |
+| AIPA w/o relationship   |    123 |        1034 | Romance   |     21933 |
+| AIPA w/o relationship   |    123 |        1034 | Drama     |     22037 |
+| AIPA w/o relationship   |    123 |        1034 | Horror    |     22052 |
+| AIPA w/o relationship   |    123 |        1035 | Comedy    |     22028 |
+| AIPA w/o relationship   |    123 |        1035 | Horror    |     22099 |
+| AIPA w/o relationship   |    123 |        1048 | Animation |     22919 |
+| AIPA w/o relationship   |    123 |        1049 | Musical   |     21963 |
+| AIPA w/o relationship   |    123 |        1053 | Horror    |     21877 |
+| AIPA w/o relationship   |    123 |        1059 | Comedy    |     23295 |
+| AIPA w/o relationship   |    123 |        1074 | Horror    |     22354 |
+| AIPA w/o relationship   |    123 |        1087 | Comedy    |     22619 |
+| AIPA w/o relationship   |    123 |        1087 | War       |     22841 |
+| AIPA w/o relationship   |    123 |        1087 | Animation |     23244 |
+| AIPA w/o relationship   |    123 |        1093 | Action    |     22937 |
+| AIPA w/o relationship   |    123 |        1099 | Horror    |     23092 |
+| AIPA w/o relationship   |    123 |         959 | Horror    |     22155 |
+| AIPA w/o relationship   |    123 |         959 | Comedy    |     22309 |
+| AIPA w/o relationship   |    123 |         960 | Horror    |     20895 |
+| AIPA w/o relationship   |    123 |         979 | Musical   |     21644 |
+| AIPA w/o relationship   |    123 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |    123 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |    123 |         997 | Musical   |     21125 |
+| AIPA w/o counterfactual |    123 |        1009 | Comedy    |     21182 |
+| AIPA w/o counterfactual |    123 |        1011 | Comedy    |     21382 |
+| AIPA w/o counterfactual |    123 |        1011 | Animation |     21621 |
+| AIPA w/o counterfactual |    123 |        1011 | Horror    |     21718 |
+| AIPA w/o counterfactual |    123 |        1016 | Animation |     21074 |
+| AIPA w/o counterfactual |    123 |        1022 | Comedy    |     21379 |
+| AIPA w/o counterfactual |    123 |        1024 | Horror    |     21527 |
+| AIPA w/o counterfactual |    123 |        1024 | Animation |     21627 |
+| AIPA w/o counterfactual |    123 |        1034 | Comedy    |     21786 |
+| AIPA w/o counterfactual |    123 |        1034 | Romance   |     21933 |
+| AIPA w/o counterfactual |    123 |        1034 | Horror    |     22078 |
+| AIPA w/o counterfactual |    123 |        1035 | Comedy    |     22028 |
+| AIPA w/o counterfactual |    123 |        1035 | Horror    |     22099 |
+| AIPA w/o counterfactual |    123 |        1046 | Musical   |     22536 |
+| AIPA w/o counterfactual |    123 |        1048 | Animation |     22919 |
+| AIPA w/o counterfactual |    123 |        1053 | Horror    |     21877 |
+| AIPA w/o counterfactual |    123 |        1059 | Comedy    |     23295 |
+| AIPA w/o counterfactual |    123 |        1074 | Horror    |     22354 |
+| AIPA w/o counterfactual |    123 |        1087 | Comedy    |     22619 |
+| AIPA w/o counterfactual |    123 |        1087 | War       |     22841 |
+| AIPA w/o counterfactual |    123 |        1087 | Animation |     23244 |
+| AIPA w/o counterfactual |    123 |        1093 | Action    |     22937 |
+| AIPA w/o counterfactual |    123 |        1093 | War       |     23101 |
+| AIPA w/o counterfactual |    123 |        1099 | Horror    |     23092 |
+| AIPA w/o counterfactual |    123 |        1110 | Action    |     23277 |
+| AIPA w/o counterfactual |    123 |         959 | Horror    |     22155 |
+| AIPA w/o counterfactual |    123 |         959 | Comedy    |     22309 |
+| AIPA w/o counterfactual |    123 |         960 | Horror    |     20895 |
+| AIPA w/o counterfactual |    123 |         979 | Musical   |     21644 |
+| AIPA w/o counterfactual |    123 |         996 | Comedy    |     22739 |
+| AIPA w/o counterfactual |    123 |         997 | Horror    |     20780 |
+| AIPA w/o counterfactual |    123 |         997 | Musical   |     21125 |
+| AIPA w/o clarification  |    123 |        1009 | Comedy    |     22441 |
+| AIPA w/o clarification  |    123 |        1011 | Comedy    |     21113 |
+| AIPA w/o clarification  |    123 |        1011 | Horror    |     21718 |
+| AIPA w/o clarification  |    123 |        1022 | Comedy    |     21379 |
+| AIPA w/o clarification  |    123 |        1024 | Animation |     21627 |
+| AIPA w/o clarification  |    123 |        1034 | Romance   |     21378 |
+| AIPA w/o clarification  |    123 |        1034 | Horror    |     22052 |
+| AIPA w/o clarification  |    123 |        1035 | Comedy    |     22028 |
+| AIPA w/o clarification  |    123 |        1035 | Horror    |     22099 |
+| AIPA w/o clarification  |    123 |        1046 | Comedy    |     22959 |
+| AIPA w/o clarification  |    123 |        1053 | Horror    |     21877 |
+| AIPA w/o clarification  |    123 |        1059 | Comedy    |     23295 |
+| AIPA w/o clarification  |    123 |        1074 | Horror    |     22354 |
+| AIPA w/o clarification  |    123 |        1087 | Comedy    |     22619 |
+| AIPA w/o clarification  |    123 |        1087 | Romance   |     22636 |
+| AIPA w/o clarification  |    123 |        1093 | Action    |     22937 |
+| AIPA w/o clarification  |    123 |        1110 | Action    |     23277 |
+| AIPA w/o clarification  |    123 |         959 | Comedy    |     22309 |
+| AIPA w/o clarification  |    123 |         959 | Horror    |     22313 |
+| AIPA w/o clarification  |    123 |         972 | Comedy    |     22169 |
+| AIPA w/o clarification  |    123 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |    123 |        1011 | Horror    |     21238 |
+| AIPA (rule policy)      |    123 |        1011 | Comedy    |     21382 |
+| AIPA (rule policy)      |    123 |        1024 | Horror    |     21527 |
+| AIPA (rule policy)      |    123 |        1024 | Animation |     21627 |
+| AIPA (rule policy)      |    123 |        1034 | Horror    |     22016 |
+| AIPA (rule policy)      |    123 |        1035 | Horror    |     22099 |
+| AIPA (rule policy)      |    123 |        1048 | Animation |     22919 |
+| AIPA (rule policy)      |    123 |        1053 | Horror    |     21877 |
+| AIPA (rule policy)      |    123 |        1074 | Horror    |     23249 |
+| AIPA (rule policy)      |    123 |        1087 | Romance   |     22636 |
+| AIPA (rule policy)      |    123 |        1087 | Comedy    |     22934 |
+| AIPA (rule policy)      |    123 |        1087 | War       |     22989 |
+| AIPA (rule policy)      |    123 |        1087 | Horror    |     23110 |
+| AIPA (rule policy)      |    123 |        1093 | Action    |     22937 |
+| AIPA (rule policy)      |    123 |        1093 | Horror    |     23050 |
+| AIPA (rule policy)      |    123 |         959 | Horror    |     21904 |
+| AIPA (rule policy)      |    123 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |    123 |         997 | Horror    |     20780 |
+| AIPA (full)             |    123 |        1009 | Comedy    |     22441 |
+| AIPA (full)             |    123 |        1011 | Comedy    |     21382 |
+| AIPA (full)             |    123 |        1011 | Horror    |     21718 |
+| AIPA (full)             |    123 |        1022 | Comedy    |     21379 |
+| AIPA (full)             |    123 |        1035 | Comedy    |     21317 |
+| AIPA (full)             |    123 |        1035 | Horror    |     22099 |
+| AIPA (full)             |    123 |        1046 | Comedy    |     22959 |
+| AIPA (full)             |    123 |        1049 | Musical   |     21963 |
+| AIPA (full)             |    123 |        1053 | Horror    |     21877 |
+| AIPA (full)             |    123 |        1059 | Comedy    |     23295 |
+| AIPA (full)             |    123 |        1074 | Horror    |     22354 |
+| AIPA (full)             |    123 |        1087 | Comedy    |     22619 |
+| AIPA (full)             |    123 |        1087 | Horror    |     23110 |
+| AIPA (full)             |    123 |        1093 | Action    |     22937 |
+| AIPA (full)             |    123 |        1099 | Horror    |     23092 |
+| AIPA (full)             |    123 |        1110 | Action    |     23277 |
+| AIPA (full)             |    123 |         959 | Comedy    |     22309 |
+| AIPA (full)             |    123 |         959 | Horror    |     22313 |
+| AIPA (full)             |    123 |         972 | Comedy    |     22169 |
+| AIPA (full)             |    123 |         979 | Musical   |     21644 |
+| AIPA (full)             |    123 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |   2024 |        1008 | Comedy    |     21009 |
+| AIPA w/o relationship   |   2024 |        1009 | Comedy    |     22441 |
+| AIPA w/o relationship   |   2024 |        1011 | Comedy    |     21113 |
+| AIPA w/o relationship   |   2024 |        1011 | Drama     |     21562 |
+| AIPA w/o relationship   |   2024 |        1011 | Horror    |     21718 |
+| AIPA w/o relationship   |   2024 |        1016 | Animation |     20908 |
+| AIPA w/o relationship   |   2024 |        1016 | Action    |     20930 |
+| AIPA w/o relationship   |   2024 |        1016 | Horror    |     20930 |
+| AIPA w/o relationship   |   2024 |        1016 | Drama     |     22968 |
+| AIPA w/o relationship   |   2024 |        1024 | Animation |     21627 |
+| AIPA w/o relationship   |   2024 |        1034 | Comedy    |     21335 |
+| AIPA w/o relationship   |   2024 |        1034 | Romance   |     21933 |
+| AIPA w/o relationship   |   2024 |        1034 | Horror    |     21958 |
+| AIPA w/o relationship   |   2024 |        1034 | Drama     |     22037 |
+| AIPA w/o relationship   |   2024 |        1035 | Comedy    |     21317 |
+| AIPA w/o relationship   |   2024 |        1035 | Horror    |     22099 |
+| AIPA w/o relationship   |   2024 |        1035 | Romance   |     22922 |
+| AIPA w/o relationship   |   2024 |        1046 | Comedy    |     22135 |
+| AIPA w/o relationship   |   2024 |        1046 | Musical   |     22536 |
+| AIPA w/o relationship   |   2024 |        1053 | Horror    |     21877 |
+| AIPA w/o relationship   |   2024 |        1054 | Action    |     21918 |
+| AIPA w/o relationship   |   2024 |        1057 | Drama     |     21910 |
+| AIPA w/o relationship   |   2024 |        1057 | Crime     |     22134 |
+| AIPA w/o relationship   |   2024 |        1057 | Horror    |     22138 |
+| AIPA w/o relationship   |   2024 |        1059 | Comedy    |     23295 |
+| AIPA w/o relationship   |   2024 |        1074 | Horror    |     22354 |
+| AIPA w/o relationship   |   2024 |        1087 | Comedy    |     22619 |
+| AIPA w/o relationship   |   2024 |        1087 | Drama     |     22629 |
+| AIPA w/o relationship   |   2024 |        1087 | Romance   |     22636 |
+| AIPA w/o relationship   |   2024 |        1087 | Action    |     22711 |
+| AIPA w/o relationship   |   2024 |        1087 | War       |     22841 |
+| AIPA w/o relationship   |   2024 |        1087 | Animation |     22869 |
+| AIPA w/o relationship   |   2024 |        1087 | Horror    |     22958 |
+| AIPA w/o relationship   |   2024 |        1088 | Drama     |     22597 |
+| AIPA w/o relationship   |   2024 |        1093 | Action    |     22937 |
+| AIPA w/o relationship   |   2024 |        1093 | Horror    |     23050 |
+| AIPA w/o relationship   |   2024 |        1093 | War       |     23101 |
+| AIPA w/o relationship   |   2024 |        1099 | Horror    |     23092 |
+| AIPA w/o relationship   |   2024 |         959 | Horror    |     21899 |
+| AIPA w/o relationship   |   2024 |         959 | Romance   |     22159 |
+| AIPA w/o relationship   |   2024 |         959 | Comedy    |     22309 |
+| AIPA w/o relationship   |   2024 |         960 | Horror    |     20864 |
+| AIPA w/o relationship   |   2024 |         960 | Action    |     21015 |
+| AIPA w/o relationship   |   2024 |         961 | Horror    |     20055 |
+| AIPA w/o relationship   |   2024 |         972 | Comedy    |     22169 |
+| AIPA w/o relationship   |   2024 |         976 | Comedy    |     20545 |
+| AIPA w/o relationship   |   2024 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |   2024 |         997 | Musical   |     20733 |
+| AIPA w/o relationship   |   2024 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |   2024 |         997 | Action    |     20780 |
+| AIPA w/o counterfactual |   2024 |        1008 | Comedy    |     21009 |
+| AIPA w/o counterfactual |   2024 |        1009 | Comedy    |     22441 |
+| AIPA w/o counterfactual |   2024 |        1011 | Comedy    |     21113 |
+| AIPA w/o counterfactual |   2024 |        1011 | Horror    |     21718 |
+| AIPA w/o counterfactual |   2024 |        1016 | Animation |     20908 |
+| AIPA w/o counterfactual |   2024 |        1016 | Action    |     20930 |
+| AIPA w/o counterfactual |   2024 |        1016 | Horror    |     20930 |
+| AIPA w/o counterfactual |   2024 |        1016 | Drama     |     22977 |
+| AIPA w/o counterfactual |   2024 |        1022 | Comedy    |     21602 |
+| AIPA w/o counterfactual |   2024 |        1024 | Animation |     21627 |
+| AIPA w/o counterfactual |   2024 |        1034 | Comedy    |     21335 |
+| AIPA w/o counterfactual |   2024 |        1034 | Romance   |     21933 |
+| AIPA w/o counterfactual |   2024 |        1034 | Horror    |     21958 |
+| AIPA w/o counterfactual |   2024 |        1034 | Drama     |     22037 |
+| AIPA w/o counterfactual |   2024 |        1034 | Action    |     22065 |
+| AIPA w/o counterfactual |   2024 |        1035 | Comedy    |     21317 |
+| AIPA w/o counterfactual |   2024 |        1035 | Horror    |     22099 |
+| AIPA w/o counterfactual |   2024 |        1035 | Children  |     22130 |
+| AIPA w/o counterfactual |   2024 |        1035 | Musical   |     22905 |
+| AIPA w/o counterfactual |   2024 |        1035 | Romance   |     22922 |
+| AIPA w/o counterfactual |   2024 |        1046 | Comedy    |     22135 |
+| AIPA w/o counterfactual |   2024 |        1046 | Musical   |     22536 |
+| AIPA w/o counterfactual |   2024 |        1053 | Horror    |     21877 |
+| AIPA w/o counterfactual |   2024 |        1054 | Action    |     21918 |
+| AIPA w/o counterfactual |   2024 |        1057 | Crime     |     22134 |
+| AIPA w/o counterfactual |   2024 |        1059 | Comedy    |     23295 |
+| AIPA w/o counterfactual |   2024 |        1074 | Horror    |     22354 |
+| AIPA w/o counterfactual |   2024 |        1087 | Comedy    |     22619 |
+| AIPA w/o counterfactual |   2024 |        1087 | Romance   |     22636 |
+| AIPA w/o counterfactual |   2024 |        1087 | War       |     22841 |
+| AIPA w/o counterfactual |   2024 |        1087 | Animation |     22869 |
+| AIPA w/o counterfactual |   2024 |        1087 | Horror    |     22958 |
+| AIPA w/o counterfactual |   2024 |        1093 | Action    |     22937 |
+| AIPA w/o counterfactual |   2024 |        1093 | Horror    |     23050 |
+| AIPA w/o counterfactual |   2024 |        1099 | Horror    |     23092 |
+| AIPA w/o counterfactual |   2024 |         959 | Horror    |     21904 |
+| AIPA w/o counterfactual |   2024 |         959 | Romance   |     22159 |
+| AIPA w/o counterfactual |   2024 |         959 | Comedy    |     22309 |
+| AIPA w/o counterfactual |   2024 |         960 | Action    |     20867 |
+| AIPA w/o counterfactual |   2024 |         960 | Horror    |     20895 |
+| AIPA w/o counterfactual |   2024 |         967 | Action    |     21737 |
+| AIPA w/o counterfactual |   2024 |         972 | Comedy    |     22169 |
+| AIPA w/o counterfactual |   2024 |         976 | Comedy    |     20545 |
+| AIPA w/o counterfactual |   2024 |         996 | Comedy    |     22739 |
+| AIPA w/o counterfactual |   2024 |         996 | Children  |     22940 |
+| AIPA w/o counterfactual |   2024 |         997 | Musical   |     20733 |
+| AIPA w/o counterfactual |   2024 |         997 | Horror    |     20780 |
+| AIPA w/o counterfactual |   2024 |         997 | Action    |     20780 |
+| AIPA w/o clarification  |   2024 |        1009 | Comedy    |     22441 |
+| AIPA w/o clarification  |   2024 |        1011 | Comedy    |     21113 |
+| AIPA w/o clarification  |   2024 |        1011 | Animation |     21621 |
+| AIPA w/o clarification  |   2024 |        1016 | Animation |     20908 |
+| AIPA w/o clarification  |   2024 |        1024 | Animation |     21537 |
+| AIPA w/o clarification  |   2024 |        1034 | Comedy    |     21335 |
+| AIPA w/o clarification  |   2024 |        1034 | Romance   |     21933 |
+| AIPA w/o clarification  |   2024 |        1035 | Comedy    |     21317 |
+| AIPA w/o clarification  |   2024 |        1035 | Horror    |     22099 |
+| AIPA w/o clarification  |   2024 |        1035 | Children  |     22130 |
+| AIPA w/o clarification  |   2024 |        1035 | Musical   |     22905 |
+| AIPA w/o clarification  |   2024 |        1035 | Romance   |     22922 |
+| AIPA w/o clarification  |   2024 |        1046 | Comedy    |     22135 |
+| AIPA w/o clarification  |   2024 |        1046 | Musical   |     22536 |
+| AIPA w/o clarification  |   2024 |        1048 | Animation |     22919 |
+| AIPA w/o clarification  |   2024 |        1053 | Horror    |     21877 |
+| AIPA w/o clarification  |   2024 |        1059 | Action    |     23264 |
+| AIPA w/o clarification  |   2024 |        1059 | Comedy    |     23295 |
+| AIPA w/o clarification  |   2024 |        1074 | Horror    |     23249 |
+| AIPA w/o clarification  |   2024 |        1087 | Comedy    |     22619 |
+| AIPA w/o clarification  |   2024 |        1087 | Romance   |     22636 |
+| AIPA w/o clarification  |   2024 |        1087 | War       |     22841 |
+| AIPA w/o clarification  |   2024 |        1087 | Animation |     23244 |
+| AIPA w/o clarification  |   2024 |        1088 | Drama     |     22597 |
+| AIPA w/o clarification  |   2024 |        1093 | Action    |     22937 |
+| AIPA w/o clarification  |   2024 |        1093 | Horror    |     23050 |
+| AIPA w/o clarification  |   2024 |         959 | Comedy    |     22309 |
+| AIPA w/o clarification  |   2024 |         959 | Horror    |     22313 |
+| AIPA w/o clarification  |   2024 |         960 | Action    |     21015 |
+| AIPA w/o clarification  |   2024 |         972 | Comedy    |     22169 |
+| AIPA w/o clarification  |   2024 |         976 | Comedy    |     20545 |
+| AIPA w/o clarification  |   2024 |         996 | Comedy    |     22739 |
+| AIPA w/o clarification  |   2024 |         997 | Horror    |     20780 |
+| AIPA (rule policy)      |   2024 |        1008 | Comedy    |     21914 |
+| AIPA (rule policy)      |   2024 |        1009 | Comedy    |     21182 |
+| AIPA (rule policy)      |   2024 |        1011 | Comedy    |     21113 |
+| AIPA (rule policy)      |   2024 |        1011 | Horror    |     21718 |
+| AIPA (rule policy)      |   2024 |        1022 | Comedy    |     21783 |
+| AIPA (rule policy)      |   2024 |        1024 | Animation |     21627 |
+| AIPA (rule policy)      |   2024 |        1034 | Comedy    |     21335 |
+| AIPA (rule policy)      |   2024 |        1034 | Romance   |     21933 |
+| AIPA (rule policy)      |   2024 |        1034 | Horror    |     22052 |
+| AIPA (rule policy)      |   2024 |        1035 | Horror    |     22099 |
+| AIPA (rule policy)      |   2024 |        1035 | Children  |     22130 |
+| AIPA (rule policy)      |   2024 |        1035 | Comedy    |     22142 |
+| AIPA (rule policy)      |   2024 |        1035 | Romance   |     22922 |
+| AIPA (rule policy)      |   2024 |        1046 | Comedy    |     22135 |
+| AIPA (rule policy)      |   2024 |        1046 | Musical   |     22865 |
+| AIPA (rule policy)      |   2024 |        1053 | Horror    |     21877 |
+| AIPA (rule policy)      |   2024 |        1059 | Comedy    |     23295 |
+| AIPA (rule policy)      |   2024 |        1074 | Horror    |     22354 |
+| AIPA (rule policy)      |   2024 |        1087 | Comedy    |     22619 |
+| AIPA (rule policy)      |   2024 |        1087 | War       |     22841 |
+| AIPA (rule policy)      |   2024 |        1087 | Horror    |     23110 |
+| AIPA (rule policy)      |   2024 |        1093 | Action    |     22937 |
+| AIPA (rule policy)      |   2024 |        1093 | Horror    |     23050 |
+| AIPA (rule policy)      |   2024 |        1093 | War       |     23101 |
+| AIPA (rule policy)      |   2024 |        1099 | Horror    |     23092 |
+| AIPA (rule policy)      |   2024 |         959 | Comedy    |     22309 |
+| AIPA (rule policy)      |   2024 |         959 | Horror    |     22313 |
+| AIPA (rule policy)      |   2024 |         960 | Horror    |     20971 |
+| AIPA (rule policy)      |   2024 |         972 | Comedy    |     21504 |
+| AIPA (rule policy)      |   2024 |         976 | Comedy    |     20545 |
+| AIPA (rule policy)      |   2024 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |   2024 |         997 | Musical   |     20733 |
+| AIPA (rule policy)      |   2024 |         997 | Horror    |     20780 |
+| AIPA (rule policy)      |   2024 |         997 | Comedy    |     21065 |
+| AIPA (full)             |   2024 |        1009 | Comedy    |     22441 |
+| AIPA (full)             |   2024 |        1011 | Comedy    |     21113 |
+| AIPA (full)             |   2024 |        1011 | Drama     |     21683 |
+| AIPA (full)             |   2024 |        1024 | Horror    |     21527 |
+| AIPA (full)             |   2024 |        1024 | Animation |     21627 |
+| AIPA (full)             |   2024 |        1034 | Comedy    |     21335 |
+| AIPA (full)             |   2024 |        1034 | Romance   |     21933 |
+| AIPA (full)             |   2024 |        1034 | Horror    |     22052 |
+| AIPA (full)             |   2024 |        1035 | Comedy    |     21317 |
+| AIPA (full)             |   2024 |        1035 | Horror    |     22099 |
+| AIPA (full)             |   2024 |        1035 | Drama     |     22175 |
+| AIPA (full)             |   2024 |        1046 | Comedy    |     22135 |
+| AIPA (full)             |   2024 |        1046 | Musical   |     22536 |
+| AIPA (full)             |   2024 |        1053 | Horror    |     21877 |
+| AIPA (full)             |   2024 |        1059 | Comedy    |     23295 |
+| AIPA (full)             |   2024 |        1074 | Horror    |     22354 |
+| AIPA (full)             |   2024 |        1087 | Comedy    |     22619 |
+| AIPA (full)             |   2024 |        1087 | War       |     22841 |
+| AIPA (full)             |   2024 |        1087 | Horror    |     23110 |
+| AIPA (full)             |   2024 |        1093 | Action    |     22937 |
+| AIPA (full)             |   2024 |        1093 | Horror    |     23050 |
+| AIPA (full)             |   2024 |        1093 | War       |     23103 |
+| AIPA (full)             |   2024 |        1099 | Horror    |     23092 |
+| AIPA (full)             |   2024 |         959 | Horror    |     22155 |
+| AIPA (full)             |   2024 |         959 | Comedy    |     22309 |
+| AIPA (full)             |   2024 |         960 | Horror    |     20895 |
+| AIPA (full)             |   2024 |         960 | Action    |     21015 |
+| AIPA (full)             |   2024 |         972 | Comedy    |     22169 |
+| AIPA (full)             |   2024 |         976 | Comedy    |     20545 |
+| AIPA (full)             |   2024 |         996 | Comedy    |     22739 |
+| AIPA (full)             |   2024 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |  31337 |        1001 | Action    |     21269 |
+| AIPA w/o relationship   |  31337 |        1009 | Crime     |     21225 |
+| AIPA w/o relationship   |  31337 |        1009 | Comedy    |     22441 |
+| AIPA w/o relationship   |  31337 |        1011 | Comedy    |     21113 |
+| AIPA w/o relationship   |  31337 |        1011 | Drama     |     21591 |
+| AIPA w/o relationship   |  31337 |        1011 | Action    |     21657 |
+| AIPA w/o relationship   |  31337 |        1011 | Horror    |     21718 |
+| AIPA w/o relationship   |  31337 |        1016 | Drama     |     20836 |
+| AIPA w/o relationship   |  31337 |        1016 | Action    |     20915 |
+| AIPA w/o relationship   |  31337 |        1016 | Horror    |     20930 |
+| AIPA w/o relationship   |  31337 |        1022 | Comedy    |     21593 |
+| AIPA w/o relationship   |  31337 |        1024 | Animation |     21537 |
+| AIPA w/o relationship   |  31337 |        1034 | Comedy    |     21335 |
+| AIPA w/o relationship   |  31337 |        1034 | Horror    |     21411 |
+| AIPA w/o relationship   |  31337 |        1034 | Romance   |     21933 |
+| AIPA w/o relationship   |  31337 |        1034 | Drama     |     21957 |
+| AIPA w/o relationship   |  31337 |        1035 | Comedy    |     21317 |
+| AIPA w/o relationship   |  31337 |        1035 | Horror    |     22099 |
+| AIPA w/o relationship   |  31337 |        1035 | Children  |     22130 |
+| AIPA w/o relationship   |  31337 |        1035 | Drama     |     22175 |
+| AIPA w/o relationship   |  31337 |        1035 | Romance   |     22922 |
+| AIPA w/o relationship   |  31337 |        1046 | Comedy    |     22135 |
+| AIPA w/o relationship   |  31337 |        1046 | Musical   |     22536 |
+| AIPA w/o relationship   |  31337 |        1048 | Animation |     22919 |
+| AIPA w/o relationship   |  31337 |        1049 | Drama     |     21771 |
+| AIPA w/o relationship   |  31337 |        1049 | Musical   |     21963 |
+| AIPA w/o relationship   |  31337 |        1053 | Horror    |     21877 |
+| AIPA w/o relationship   |  31337 |        1054 | Action    |     21918 |
+| AIPA w/o relationship   |  31337 |        1057 | Crime     |     22134 |
+| AIPA w/o relationship   |  31337 |        1059 | Comedy    |     23295 |
+| AIPA w/o relationship   |  31337 |        1074 | Horror    |     22354 |
+| AIPA w/o relationship   |  31337 |        1074 | Comedy    |     22403 |
+| AIPA w/o relationship   |  31337 |        1083 | Drama     |     23319 |
+| AIPA w/o relationship   |  31337 |        1087 | Drama     |     22591 |
+| AIPA w/o relationship   |  31337 |        1087 | Comedy    |     22619 |
+| AIPA w/o relationship   |  31337 |        1087 | Romance   |     22636 |
+| AIPA w/o relationship   |  31337 |        1087 | Action    |     22711 |
+| AIPA w/o relationship   |  31337 |        1087 | War       |     22841 |
+| AIPA w/o relationship   |  31337 |        1087 | Animation |     22869 |
+| AIPA w/o relationship   |  31337 |        1087 | Horror    |     22915 |
+| AIPA w/o relationship   |  31337 |        1088 | Drama     |     22600 |
+| AIPA w/o relationship   |  31337 |        1093 | Action    |     22937 |
+| AIPA w/o relationship   |  31337 |        1093 | Horror    |     23050 |
+| AIPA w/o relationship   |  31337 |        1095 | Horror    |     22812 |
+| AIPA w/o relationship   |  31337 |        1110 | Action    |     23277 |
+| AIPA w/o relationship   |  31337 |         959 | Horror    |     21904 |
+| AIPA w/o relationship   |  31337 |         959 | Romance   |     22159 |
+| AIPA w/o relationship   |  31337 |         959 | Comedy    |     22309 |
+| AIPA w/o relationship   |  31337 |         960 | Horror    |     20895 |
+| AIPA w/o relationship   |  31337 |         961 | Comedy    |     20054 |
+| AIPA w/o relationship   |  31337 |         972 | Comedy    |     22169 |
+| AIPA w/o relationship   |  31337 |         972 | Crime     |     22326 |
+| AIPA w/o relationship   |  31337 |         976 | Comedy    |     20545 |
+| AIPA w/o relationship   |  31337 |         979 | Musical   |     21644 |
+| AIPA w/o relationship   |  31337 |         991 | Drama     |     21239 |
+| AIPA w/o relationship   |  31337 |         995 | Drama     |     20566 |
+| AIPA w/o relationship   |  31337 |         996 | Comedy    |     22739 |
+| AIPA w/o relationship   |  31337 |         996 | Children  |     22940 |
+| AIPA w/o relationship   |  31337 |         997 | Musical   |     20733 |
+| AIPA w/o relationship   |  31337 |         997 | Action    |     20748 |
+| AIPA w/o relationship   |  31337 |         997 | Horror    |     20780 |
+| AIPA w/o relationship   |  31337 |         997 | Drama     |     20999 |
+| AIPA w/o counterfactual |  31337 |        1006 | Comedy    |     22845 |
+| AIPA w/o counterfactual |  31337 |        1011 | Comedy    |     21376 |
+| AIPA w/o counterfactual |  31337 |        1011 | Drama     |     21591 |
+| AIPA w/o counterfactual |  31337 |        1011 | Horror    |     21718 |
+| AIPA w/o counterfactual |  31337 |        1016 | Action    |     20930 |
+| AIPA w/o counterfactual |  31337 |        1016 | Horror    |     20930 |
+| AIPA w/o counterfactual |  31337 |        1022 | Comedy    |     21379 |
+| AIPA w/o counterfactual |  31337 |        1022 | Children  |     21597 |
+| AIPA w/o counterfactual |  31337 |        1022 | Drama     |     21772 |
+| AIPA w/o counterfactual |  31337 |        1024 | Animation |     21627 |
+| AIPA w/o counterfactual |  31337 |        1034 | Horror    |     21411 |
+| AIPA w/o counterfactual |  31337 |        1034 | Comedy    |     21786 |
+| AIPA w/o counterfactual |  31337 |        1034 | Drama     |     21806 |
+| AIPA w/o counterfactual |  31337 |        1034 | Romance   |     21933 |
+| AIPA w/o counterfactual |  31337 |        1035 | Comedy    |     22009 |
+| AIPA w/o counterfactual |  31337 |        1035 | Horror    |     22009 |
+| AIPA w/o counterfactual |  31337 |        1046 | Comedy    |     22135 |
+| AIPA w/o counterfactual |  31337 |        1049 | Drama     |     21641 |
+| AIPA w/o counterfactual |  31337 |        1049 | Musical   |     21963 |
+| AIPA w/o counterfactual |  31337 |        1053 | Horror    |     21877 |
+| AIPA w/o counterfactual |  31337 |        1059 | Comedy    |     23295 |
+| AIPA w/o counterfactual |  31337 |        1074 | Horror    |     22354 |
+| AIPA w/o counterfactual |  31337 |        1087 | Drama     |     22591 |
+| AIPA w/o counterfactual |  31337 |        1087 | War       |     22721 |
+| AIPA w/o counterfactual |  31337 |        1087 | Comedy    |     22934 |
+| AIPA w/o counterfactual |  31337 |        1087 | Horror    |     23110 |
+| AIPA w/o counterfactual |  31337 |        1093 | Action    |     22937 |
+| AIPA w/o counterfactual |  31337 |        1093 | Horror    |     23050 |
+| AIPA w/o counterfactual |  31337 |        1110 | Action    |     23277 |
+| AIPA w/o counterfactual |  31337 |         959 | Horror    |     21904 |
+| AIPA w/o counterfactual |  31337 |         959 | Comedy    |     22409 |
+| AIPA w/o counterfactual |  31337 |         960 | Horror    |     20895 |
+| AIPA w/o counterfactual |  31337 |         960 | Action    |     20968 |
+| AIPA w/o counterfactual |  31337 |         961 | Comedy    |     20054 |
+| AIPA w/o counterfactual |  31337 |         979 | Musical   |     21644 |
+| AIPA w/o counterfactual |  31337 |         991 | Drama     |     21239 |
+| AIPA w/o counterfactual |  31337 |         996 | Comedy    |     22739 |
+| AIPA w/o counterfactual |  31337 |         997 | Horror    |     20780 |
+| AIPA w/o clarification  |  31337 |        1009 | Comedy    |     22441 |
+| AIPA w/o clarification  |  31337 |        1011 | Comedy    |     21113 |
+| AIPA w/o clarification  |  31337 |        1011 | Drama     |     21683 |
+| AIPA w/o clarification  |  31337 |        1024 | Animation |     21627 |
+| AIPA w/o clarification  |  31337 |        1034 | Comedy    |     21341 |
+| AIPA w/o clarification  |  31337 |        1035 | Horror    |     22099 |
+| AIPA w/o clarification  |  31337 |        1046 | Comedy    |     22959 |
+| AIPA w/o clarification  |  31337 |        1053 | Horror    |     21877 |
+| AIPA w/o clarification  |  31337 |        1059 | Comedy    |     23295 |
+| AIPA w/o clarification  |  31337 |        1074 | Horror    |     22354 |
+| AIPA w/o clarification  |  31337 |        1087 | Comedy    |     22619 |
+| AIPA w/o clarification  |  31337 |        1087 | War       |     22841 |
+| AIPA w/o clarification  |  31337 |        1093 | Action    |     22937 |
+| AIPA w/o clarification  |  31337 |        1099 | Horror    |     23092 |
+| AIPA w/o clarification  |  31337 |        1110 | Action    |     23277 |
+| AIPA w/o clarification  |  31337 |         959 | Comedy    |     22309 |
+| AIPA w/o clarification  |  31337 |         959 | Horror    |     22313 |
+| AIPA w/o clarification  |  31337 |         972 | Comedy    |     22169 |
+| AIPA w/o clarification  |  31337 |         976 | Comedy    |     20545 |
+| AIPA w/o clarification  |  31337 |         996 | Comedy    |     22739 |
+| AIPA w/o clarification  |  31337 |         997 | Horror    |     20780 |
+| AIPA (rule policy)      |  31337 |        1008 | Comedy    |     21009 |
+| AIPA (rule policy)      |  31337 |        1009 | Comedy    |     21182 |
+| AIPA (rule policy)      |  31337 |        1011 | Comedy    |     21113 |
+| AIPA (rule policy)      |  31337 |        1011 | Drama     |     21683 |
+| AIPA (rule policy)      |  31337 |        1011 | Horror    |     21718 |
+| AIPA (rule policy)      |  31337 |        1022 | Comedy    |     21043 |
+| AIPA (rule policy)      |  31337 |        1034 | Comedy    |     21358 |
+| AIPA (rule policy)      |  31337 |        1034 | Horror    |     21411 |
+| AIPA (rule policy)      |  31337 |        1034 | Romance   |     21933 |
+| AIPA (rule policy)      |  31337 |        1035 | Comedy    |     21317 |
+| AIPA (rule policy)      |  31337 |        1035 | Horror    |     22099 |
+| AIPA (rule policy)      |  31337 |        1035 | Romance   |     22922 |
+| AIPA (rule policy)      |  31337 |        1046 | Comedy    |     22135 |
+| AIPA (rule policy)      |  31337 |        1053 | Horror    |     21877 |
+| AIPA (rule policy)      |  31337 |        1074 | Horror    |     22354 |
+| AIPA (rule policy)      |  31337 |        1087 | Comedy    |     22619 |
+| AIPA (rule policy)      |  31337 |        1087 | War       |     22841 |
+| AIPA (rule policy)      |  31337 |        1087 | Horror    |     23110 |
+| AIPA (rule policy)      |  31337 |        1093 | Action    |     22937 |
+| AIPA (rule policy)      |  31337 |        1093 | Horror    |     23050 |
+| AIPA (rule policy)      |  31337 |        1099 | Comedy    |     23007 |
+| AIPA (rule policy)      |  31337 |        1110 | Action    |     23277 |
+| AIPA (rule policy)      |  31337 |         959 | Romance   |     22159 |
+| AIPA (rule policy)      |  31337 |         959 | Comedy    |     22309 |
+| AIPA (rule policy)      |  31337 |         959 | Horror    |     22313 |
+| AIPA (rule policy)      |  31337 |         972 | Comedy    |     22169 |
+| AIPA (rule policy)      |  31337 |         976 | Comedy    |     20543 |
+| AIPA (rule policy)      |  31337 |         996 | Comedy    |     22739 |
+| AIPA (rule policy)      |  31337 |         997 | Horror    |     20780 |
+| AIPA (full)             |  31337 |        1011 | Comedy    |     21113 |
+| AIPA (full)             |  31337 |        1022 | Children  |     21597 |
+| AIPA (full)             |  31337 |        1024 | Animation |     21627 |
+| AIPA (full)             |  31337 |        1034 | Comedy    |     21341 |
+| AIPA (full)             |  31337 |        1034 | Horror    |     21416 |
+| AIPA (full)             |  31337 |        1035 | Comedy    |     22036 |
+| AIPA (full)             |  31337 |        1035 | Horror    |     22099 |
+| AIPA (full)             |  31337 |        1035 | Children  |     22130 |
+| AIPA (full)             |  31337 |        1035 | Romance   |     22922 |
+| AIPA (full)             |  31337 |        1046 | Musical   |     22536 |
+| AIPA (full)             |  31337 |        1048 | Animation |     22919 |
+| AIPA (full)             |  31337 |        1053 | Horror    |     21877 |
+| AIPA (full)             |  31337 |        1054 | Action    |     21918 |
+| AIPA (full)             |  31337 |        1059 | Comedy    |     23295 |
+| AIPA (full)             |  31337 |        1074 | Horror    |     22354 |
+| AIPA (full)             |  31337 |        1087 | Comedy    |     22619 |
+| AIPA (full)             |  31337 |        1087 | Romance   |     22636 |
+| AIPA (full)             |  31337 |        1087 | War       |     22841 |
+| AIPA (full)             |  31337 |        1087 | Animation |     22869 |
+| AIPA (full)             |  31337 |        1087 | Horror    |     22958 |
+| AIPA (full)             |  31337 |        1093 | Action    |     22937 |
+| AIPA (full)             |  31337 |        1093 | Horror    |     23050 |
+| AIPA (full)             |  31337 |        1099 | Horror    |     23092 |
+| AIPA (full)             |  31337 |         959 | Horror    |     22313 |
+| AIPA (full)             |  31337 |         972 | Comedy    |     22169 |
+| AIPA (full)             |  31337 |         979 | Musical   |     21644 |
+| AIPA (full)             |  31337 |         996 | Comedy    |     22739 |
+| AIPA (full)             |  31337 |         997 | Horror    |     20780 |
+| AIPA (full)             |  31337 |         997 | Action    |     20780 |
+| AIPA (full)             |  31337 |         997 | Musical   |     21125 |
