@@ -11,7 +11,7 @@
 \usepackage{balance}
 \usepackage[hidelinks]{hyperref}
 
-\graphicspath{{../outputs/figures/}}
+\graphicspath{{figures/}{../outputs/figures/}}
 \input{tables/macros}
 \newcommand{\nrm}{\operatorname{nrm}}
 \newcommand{\vh}{\mathbf{h}}
@@ -151,12 +151,12 @@ A departure from habit that occurs in one session is a \emph{temporary override}
 \label{sec:method}
 Figure~\ref{fig:arch} shows the components. All encoders are small because the point of the work is the arbitration logic, not representational power; the item tower, the dimensionality $d=\hiddenDim$ and the training recipe are shared by every compared system so that differences are attributable to the arbitration design. Throughout, $\mathrm{MLP}(\mathbf{z})=\mathbf{W}_2\,\mathrm{GELU}(\mathbf{W}_1\mathbf{z}+\mathbf{b}_1)+\mathbf{b}_2$ with hidden width $d$ and dropout $0.1$ after the activation; each occurrence has its own parameters.
 
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  \includegraphics[width=\columnwidth]{fig00_architecture}
-  \caption{AIPA components. History and dialogue context feed separate LTP and STI encoders. A relationship classifier and a counterfactual driver probe inform the arbitration policy, which produces fusion weights (or a clarifying question). A persistence tracker decides whether repeated intent shifts should update the long-term profile.}
+  \includegraphics[width=\textwidth]{fig00_architecture.png}
+  \caption{AIPA architecture. (1) Inputs: cross-session liked-item history, profile text and a recency-decayed genre prior for the long-term side; dialogue context, in-dialogue liked items and lexical flags for the short-term side. (2) Encoders: an LTP encoder, an STI encoder and a shared item tower that scores the catalogue for either query. (3) Arbitration: the relationship classifier (3a) and the counterfactual diagnostic (3b) feed the arbitration policy (3c), whose action sets the fusion weights (3d). (4) Outputs: a top-$K$ list or a clarifying question, plus the persistence tracker that folds a repeated intent shift back into the LTP genre prior (dotted path). (5) The joint objective of Eq.~\eqref{eq:loss}. Tensor shapes are given per batch of $B$ turns over $N$ catalogue items with $d=\hiddenDim$.}
   \label{fig:arch}
-\end{figure}
+\end{figure*}
 
 \subsection{Text and item representations}
 Text is encoded by a frozen map $\phi$ that is fixed before training. In the run reported here $\phi$ is the pre-trained sentence encoder all-MiniLM-L6-v2 \cite{reimers2019sbert}, whose mean-pooled output is $\ell_2$-normalised so that $d_t=384$; the code also offers a lighter alternative fitted on the training split (word uni- and bigram TF--IDF with sublinear term frequency followed by truncated SVD),
